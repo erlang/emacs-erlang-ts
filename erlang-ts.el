@@ -136,7 +136,7 @@
      (pp_define lhs: (macro_lhs name: (_) @font-lock-preprocessor-face))
      (macro_call_expr name: (_) @font-lock-preprocessor-face)
      (["module" "export" "import" "compile" "define" "record"
-       "spec" "type" "export_type" "opaque"]
+       "spec" "type" "export_type" "opaque" "behaviour" "include" "include_lib"]
       @font-lock-preprocessor-face)
      )
 
@@ -236,7 +236,7 @@
 
   ;; (setq-local treesit-simple-indent-rules erlang-ts-indent-rules)
 
-  (if lsp-language-id-configuration
+  (if (boundp 'lsp-language-id-configuration)
       (add-to-list 'lsp-language-id-configuration
                    '(erlang-ts-mode . "erlang")))
 
