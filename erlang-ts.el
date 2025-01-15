@@ -219,7 +219,8 @@
      @font-lock-operator-face))
 
   "Tree-sitter font-lock settings for `erlang-ts-mode'.
-Use `treesit-font-lock-level' or `treesit-font-lock-feature-list' to change settings")
+Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
+ to change settings")
 
 (defun erlang-ts-paren-is-type (node)
   "Check if any parent of NODE is a type."
