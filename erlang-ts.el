@@ -1,4 +1,5 @@
 ;;; erlang-ts.el --- Major modes for editing and running Erlang -*- lexical-binding: t; -*-
+
 ;; %CopyrightBegin%
 ;;
 ;; Copyright Ericsson AB 2024-2025. All Rights Reserved.
@@ -18,6 +19,41 @@
 ;; %CopyrightEnd%
 ;;
 
+;; Author: Dan Gudmundsson
+;; Keywords: erlang, languages, treesitter
+;; URL: https://github.com/erlang/emacs-erlang-ts
+;; Package-Requires: ((emacs "29.2") (erlang "27.2"))
+;; Package-Version:
+
+;;; Commentary:
+
+;; # Emacs Erlang mode using treesitter #
+;;
+;; Requires emacs-29 compiled with treesitter support.
+;;
+;; Currently uses treesitter only for syntax-highlighting, *font-lock-mode*, and uses the "old"
+;; erlang-mode for everything else.
+;;
+;; # Install #
+;;
+;; Add to your .emacs file:
+;;
+;; ```
+;;  (add-to-list 'treesit-language-source-alist '(erlang "https://github.com/WhatsApp/tree-sitter-erlang"))
+;;
+;;  (use-package erlang-ts
+;;      :mode ("\\.erl\\'" . erlang-ts-mode)
+;;      :defer 't)
+;; ```
+;; Install/compile erlang treesitter support (first time only):
+;;
+;; ```
+;;   M-x treesit-install-language-grammar
+;;   Language: erlang
+;; ```
+;;
+;;; Code:
+
 ;; Introduction:
 ;; ------------
 ;; Currently handles font-locking for erlang-mode
@@ -30,23 +66,30 @@
 (require 'treesit)
 (require 'erlang)
 
+;; Override erlang font-lock functions
+;; So the menus (and functions) work as expected
 (defun erlang-font-lock-level-1 ()
+  "Fontify current buffer at level 1."
   (interactive)
   (erlang-ts-set-font-lock-level 1))
 
 (defun erlang-font-lock-level-2 ()
+  "Fontify current buffer at level 2."
   (interactive)
   (erlang-ts-set-font-lock-level 2))
 
 (defun erlang-font-lock-level-3 ()
+  "Fontify current buffer at level 3."
   (interactive)
   (erlang-ts-set-font-lock-level 3))
 
 (defun erlang-font-lock-level-4 ()
+  "Fontify current buffer at level 4."
   (interactive)
   (erlang-ts-set-font-lock-level 4))
 
 (defun erlang-ts-set-font-lock-level (level)
+  "Fontify current buffer to LEVEL."
   (setq treesit-font-lock-level level)
   (treesit-font-lock-recompute-features)
   (treesit-font-lock-fontify-region (point-min) (point-max)))
@@ -67,7 +110,7 @@
     "maybe"
     "else"
     "when")
-  "Erlang reserved keywords")
+  "Erlang reserved keywords.")
 
 (defvar erlang-ts-font-lock-rules
   (treesit-font-lock-rules
@@ -105,8 +148,7 @@
      (export_type_attribute types: (fa fun: (atom) @font-lock-type-face))
      (record_decl name: (atom) @font-lock-type-face
                   (record_field name: (atom) @font-lock-property-name-face))
-     (record_name name: (atom) @font-lock-type-face)
-     )
+     (record_name name: (atom) @font-lock-type-face))
 
    :language 'erlang
    :feature 'definition
@@ -114,8 +156,7 @@
      (spec fun: (atom) @font-lock-function-name-face)
      (fa fun: (atom) @font-lock-function-name-face)
      (binary_op_expr lhs: (atom) @font-lock-function-name-face "/" rhs: (integer))
-     (internal_fun fun: (atom) @font-lock-function-name-face)
-     )
+     (internal_fun fun: (atom) @font-lock-function-name-face))
 
    :language 'erlang
    :feature 'guards
@@ -137,8 +178,7 @@
      (macro_call_expr name: (_) @font-lock-preprocessor-face)
      (["module" "export" "import" "compile" "define" "record"
        "spec" "type" "export_type" "opaque" "behaviour" "include" "include_lib"]
-      @font-lock-preprocessor-face)
-     )
+      @font-lock-preprocessor-face))
 
    :language 'erlang
    :feature 'constant
@@ -176,23 +216,22 @@
    :feature 'operator
    ;; Add "<:-" "<:=" "&&"  when available in tree-sitter
    '(([ "->" "||" "<-" "<=" "+" "-" "*" "/" "++" ">" ">=" "<" "=<" "=" "==" "=:=" "=/="])
-     @font-lock-operator-face)
-   )
+     @font-lock-operator-face))
 
   "Tree-sitter font-lock settings for `erlang-ts-mode'.
-   Use `treesit-font-lock-level' or `treesit-font-lock-feature-list' to change settings")
+Use `treesit-font-lock-level' or `treesit-font-lock-feature-list' to change settings")
 
 (defun erlang-ts-paren-is-type (node)
+  "Check if any parent of NODE is a type."
   (let ((type (treesit-node-type node)))
     (cond ((member type '("type_alias" "ann_type" "type_sig" "opaque" "field_type"))
            t)
           ((not type) nil)
           (t
-           (erlang-ts-paren-is-type (treesit-node-parent node)))
-          )))
+           (erlang-ts-paren-is-type (treesit-node-parent node))))))
 
 (defun erlang-ts-setup ()
-  "Setup treesit for erlang"
+  "Setup treesit for erlang."
 
   (setq-local treesit-font-lock-settings erlang-ts-font-lock-rules)
 
@@ -202,26 +241,21 @@
                 (string             ;; Level 1
                  comment
                  keyword
-                 doc
-                 )
+                 doc)
                 (preprocessor       ;; Level 2
                  operator-atoms
                  definition
-                 type
-                 )
+                 type)
                 (builtin            ;; Level 3
                  variable
                  guards
-                 constant
-                 )
+                 constant)
                 (operator           ;; Level 4
                  delimiter
                  bracket
                  number
                  function-call
-                 index-atom
-                 )
-                ))
+                 index-atom)))
 
   ;;  (setq-local treesit-font-lock-level 3)  ;; Should we set this or let the user decide?
 
@@ -255,6 +289,4 @@
     (erlang-ts-setup)))
 
 (provide 'erlang-ts)
-;;; erlang-ts-mode.el ends here
-
-
+;;; erlang-ts.el ends here
