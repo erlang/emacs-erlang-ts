@@ -23,7 +23,7 @@
 ;; Keywords: erlang, languages, treesitter
 ;; URL: https://github.com/erlang/emacs-erlang-ts
 ;; Package-Requires: ((emacs "29.2") (erlang "27.2"))
-;; Package-Version:
+;; Package-Version: 0.1
 
 ;;; Commentary:
 
