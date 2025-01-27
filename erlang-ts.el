@@ -68,25 +68,33 @@
 
 ;; Override erlang font-lock functions
 ;; So the menus (and functions) work as expected
-(defun erlang-font-lock-level-1 ()
-  "Fontify current buffer at level 1."
-  (interactive)
-  (erlang-ts-set-font-lock-level 1))
+(defun erlang-ts--font-lock-level-1 (func &rest args)
+  "To be used as :around advice.
+FUNC with ARGS will be called if `erlang-ts-mode' is not active."
+  (if (derived-mode-p 'erlang-ts-mode)
+      (erlang-ts-set-font-lock-level 1)
+    (apply func args)))
 
-(defun erlang-font-lock-level-2 ()
-  "Fontify current buffer at level 2."
-  (interactive)
-  (erlang-ts-set-font-lock-level 2))
+(defun erlang-ts--font-lock-level-2 (func &rest args)
+  "To be used as :around advice.
+FUNC with ARGS will be called if `erlang-ts-mode' is not active."
+  (if (derived-mode-p 'erlang-ts-mode)
+      (erlang-ts-set-font-lock-level 2)
+    (apply func args)))
 
-(defun erlang-font-lock-level-3 ()
-  "Fontify current buffer at level 3."
-  (interactive)
-  (erlang-ts-set-font-lock-level 3))
+(defun erlang-ts--font-lock-level-3 (func &rest args)
+  "To be used as :around advice.
+FUNC with ARGS will be called if `erlang-ts-mode' is not active."
+  (if (derived-mode-p 'erlang-ts-mode)
+      (erlang-ts-set-font-lock-level 3)
+    (apply func args)))
 
-(defun erlang-font-lock-level-4 ()
-  "Fontify current buffer at level 4."
-  (interactive)
-  (erlang-ts-set-font-lock-level 4))
+(defun erlang-ts--font-lock-level-4 (func &rest args)
+  "To be used as :around advice.
+FUNC with ARGS will be called if `erlang-ts-mode' is not active."
+  (if (derived-mode-p 'erlang-ts-mode)
+      (erlang-ts-set-font-lock-level 4)
+    (apply func args)))
 
 (defun erlang-ts-set-font-lock-level (level)
   "Fontify current buffer to LEVEL."
@@ -279,7 +287,28 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
                "\\.hrl$" "\\.xrl$" "\\.yrl" "/ebin/.+\\.app"))
     (add-to-list 'auto-mode-alist (cons r 'erlang-ts-mode)))
 
+  ;; Override some erlang-mode functions
+  (advice-add #'erlang-font-lock-level-1 :around #'erlang-ts--font-lock-level-1)
+  (advice-add #'erlang-font-lock-level-2 :around #'erlang-ts--font-lock-level-2)
+  (advice-add #'erlang-font-lock-level-3 :around #'erlang-ts--font-lock-level-3)
+  (advice-add #'erlang-font-lock-level-4 :around #'erlang-ts--font-lock-level-4)
+
   (treesit-major-mode-setup))
+
+
+(defun erlang-ts-unload-function ()
+  "Used by `unload-feature'."
+
+  (while (rassoc 'erlang-ts-mode auto-mode-alist)
+    (setq auto-mode-alist
+          (assq-delete-all (car (rassoc 'erlang-ts-mode auto-mode-alist))
+                           auto-mode-alist)))
+
+  (advice-remove #'erlang-font-lock-level-1 #'erlang-ts--font-lock-level-1)
+  (advice-remove #'erlang-font-lock-level-2 #'erlang-ts--font-lock-level-2)
+  (advice-remove #'erlang-font-lock-level-3 #'erlang-ts--font-lock-level-3)
+  (advice-remove #'erlang-font-lock-level-4 #'erlang-ts--font-lock-level-4))
+
 
 ;;;###autoload
 (define-derived-mode erlang-ts-mode erlang-mode "erl-ts"
