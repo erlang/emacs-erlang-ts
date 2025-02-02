@@ -1,4 +1,4 @@
-;;; erlang-ts.el --- Major modes for editing and running Erlang -*- lexical-binding: t; -*-
+;;; erlang-ts.el --- Major modes for editing Erlang -*- lexical-binding: t; -*-
 
 ;; %CopyrightBegin%
 ;;
@@ -23,7 +23,7 @@
 ;; Keywords: erlang, languages, treesitter
 ;; URL: https://github.com/erlang/emacs-erlang-ts
 ;; Package-Requires: ((emacs "29.2") (erlang "27.2"))
-;; Package-Version: 0.1
+;; Package-Version: 0.2
 
 ;;; Commentary:
 
@@ -31,15 +31,16 @@
 ;;
 ;; Requires emacs-29 compiled with treesitter support.
 ;;
-;; Currently uses treesitter only for syntax-highlighting, *font-lock-mode*, and uses the "old"
-;; erlang-mode for everything else.
+;; Currently uses treesitter only for syntax-highlighting,
+;; *font-lock-mode*, and uses the "old" erlang-mode for everything else.
 ;;
 ;; # Install #
 ;;
 ;; Add to your .emacs file:
 ;;
 ;; ```
-;;  (add-to-list 'treesit-language-source-alist '(erlang "https://github.com/WhatsApp/tree-sitter-erlang"))
+;;  (add-to-list 'treesit-language-source-alist
+;;       '(erlang "https://github.com/WhatsApp/tree-sitter-erlang"))
 ;;
 ;;  (use-package erlang-ts
 ;;      :mode ("\\.erl\\'" . erlang-ts-mode)
@@ -124,9 +125,11 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
   (treesit-font-lock-rules
    :language 'erlang
    :feature 'doc
-   `((wild_attribute name: (attr_name name: (atom) @name (:equal "doc" @name))
+   `((wild_attribute name: (attr_name name: (atom)
+                                      @name (:equal "doc" @name))
                      value: (string) @font-lock-doc-face)
-     (wild_attribute name: (attr_name name: (atom) @name (:equal "moduledoc" @name))
+     (wild_attribute name: (attr_name name: (atom)
+                                      @name (:equal "moduledoc" @name))
                      value: (string) @font-lock-doc-face))
 
    :language 'erlang
@@ -151,7 +154,8 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
    :feature 'type
    :override t
    `(  ;; Might be slow but don't know a better way to do it
-     (call expr: (_) @font-lock-type-face (:pred erlang-ts-paren-is-type @font-lock-type-face))
+     (call expr: (_) @font-lock-type-face
+           (:pred erlang-ts-paren-is-type @font-lock-type-face))
      (type_name name: (atom) @font-lock-type-face)
      (export_type_attribute types: (fa fun: (atom) @font-lock-type-face))
      (record_decl name: (atom) @font-lock-type-face
@@ -163,7 +167,8 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
    `((function_clause name: (atom) @font-lock-function-name-face)
      (spec fun: (atom) @font-lock-function-name-face)
      (fa fun: (atom) @font-lock-function-name-face)
-     (binary_op_expr lhs: (atom) @font-lock-function-name-face "/" rhs: (integer))
+     (binary_op_expr lhs: (atom) @font-lock-function-name-face "/"
+                     rhs: (integer))
      (internal_fun fun: (atom) @font-lock-function-name-face))
 
    :language 'erlang
@@ -173,10 +178,14 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
 
    :language 'erlang
    :feature 'builtin
-   `((call expr: (atom) @font-lock-builtin-face (:match ,erlang-int-bif-regexp @font-lock-builtin-face))
-     (call expr: (remote module:
-                         (remote_module module: (atom) @module (:equal "erlang" @module))
-                         fun: (atom) @fun (:match ,erlang-ext-bif-regexp @fun)) @font-lock-builtin-face))
+   `((call expr: (atom) @font-lock-builtin-face
+           (:match ,erlang-int-bif-regexp @font-lock-builtin-face))
+     (call expr:
+           (remote module:
+                   (remote_module module: (atom)
+                                  @module (:equal "erlang" @module))
+                   fun: (atom) @fun (:match ,erlang-ext-bif-regexp @fun))
+           @font-lock-builtin-face))
 
    :language 'erlang
    :feature 'preprocessor
@@ -223,7 +232,8 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
    :language 'erlang
    :feature 'operator
    ;; Add "<:-" "<:=" "&&"  when available in tree-sitter
-   '(([ "->" "||" "<-" "<=" "+" "-" "*" "/" "++" ">" ">=" "<" "=<" "=" "==" "=:=" "=/="])
+   '(([ "->" "||" "<-" "<=" "+" "-" "*" "/" "++"
+        ">" ">=" "<" "=<" "=" "==" "=:=" "=/="])
      @font-lock-operator-face))
 
   "Tree-sitter font-lock settings for `erlang-ts-mode'.
@@ -233,7 +243,8 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
 (defun erlang-ts-paren-is-type (node)
   "Check if any parent of NODE is a type."
   (let ((type (treesit-node-type node)))
-    (cond ((member type '("type_alias" "ann_type" "type_sig" "opaque" "field_type"))
+    (cond ((member type '("type_alias" "ann_type" "type_sig"
+                          "opaque" "field_type"))
            t)
           ((not type) nil)
           (t
@@ -266,11 +277,13 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
                  function-call
                  index-atom)))
 
-  ;;  (setq-local treesit-font-lock-level 3)  ;; Should we set this or let the user decide?
+  ;; Should we set this or let the user decide?
+  ;;  (setq-local treesit-font-lock-level 3)
 
-  ;;  If default color for: font-lock-property-name-face and/or font-lock-property-use-face
-  ;;  change it since they by default inherit from font-lock-variable-name-face
-  ;;  which looks strange in erlang
+  ;;  If default color for: font-lock-property-name-face and/or
+  ;;  font-lock-property-use-face change it since they by default
+  ;;  inherit from font-lock-variable-name-face which looks strange in
+  ;;  erlang
 
   (if (eq (face-user-default-spec 'font-lock-property-name-face)
           (face-default-spec 'font-lock-property-name-face))
