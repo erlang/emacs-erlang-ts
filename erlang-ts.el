@@ -201,7 +201,8 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
 
    :language 'erlang
    :feature 'constant
-   `(((atom) @font-lock-constant-face (:match "^'.*" @font-lock-constant-face))
+   `((module_attribute name: (atom) @font-lock-constant-face)
+     ((atom) @font-lock-constant-face (:match "^'.*" @font-lock-constant-face))
      ((char) @font-lock-constant-face (:match "^$.*" @font-lock-constant-face)))
 
    :language 'erlang
