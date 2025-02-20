@@ -155,7 +155,7 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
    :override t
    `(  ;; Might be slow but don't know a better way to do it
      (call expr: (_) @font-lock-type-face
-           (:pred erlang-ts-paren-is-type @font-lock-type-face))
+           (:pred erlang-ts-in-type-context-p @font-lock-type-face))
      (type_name name: (atom) @font-lock-type-face)
      (export_type_attribute types: (fa fun: (atom) @font-lock-type-face))
      (record_decl name: (atom) @font-lock-type-face
@@ -185,7 +185,9 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
                    (remote_module module: (atom)
                                   @module (:equal "erlang" @module))
                    fun: (atom) @fun (:match ,erlang-ext-bif-regexp @fun))
-           @font-lock-builtin-face))
+           @font-lock-builtin-face)
+     (call expr: (atom) @font-lock-builtin-face
+           (:match ,erlang-guards-regexp @font-lock-builtin-face)))
 
    :language 'erlang
    :feature 'preprocessor
@@ -240,15 +242,15 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
 Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
  to change settings")
 
-(defun erlang-ts-paren-is-type (node)
-  "Check if any parent of NODE is a type."
-  (let ((type (treesit-node-type node)))
-    (cond ((member type '("type_alias" "ann_type" "type_sig"
-                          "opaque" "field_type"))
-           t)
-          ((not type) nil)
-          (t
-           (erlang-ts-paren-is-type (treesit-node-parent node))))))
+(defun erlang-ts-in-type-context-p (node)
+  "Check if NODE is within a type definition context."
+  (when node
+    (let ((parent (treesit-node-parent node)))
+      (cond
+       ((null parent) nil)
+       ((member (treesit-node-type parent)
+                '("type_alias" "ann_type" "type_sig" "opaque" "field_type")) t)
+       (t (erlang-ts-in-type-context-p parent))))))
 
 (defun erlang-ts-setup ()
   "Setup treesit for erlang."
