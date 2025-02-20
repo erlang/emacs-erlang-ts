@@ -222,7 +222,12 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
 
    :language 'erlang
    :feature 'function-call
-   `((call expr:  (_) @font-lock-function-call-face))
+   `(
+     (call expr: (atom) @font-lock-function-call-face)
+     (call expr: (remote module: (remote_module module: (atom) @font-lock-constant-face)
+                         fun: (atom) @font-lock-function-call-face))
+     (call expr: (remote fun: (atom) @font-lock-function-call-face))
+     (remote module: (remote_module module: (atom) @font-lock-constant-face)))
 
    :language 'erlang
    :feature 'bracket
@@ -272,12 +277,12 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
                 (builtin            ;; Level 3
                  variable
                  guards
+                 function-call
                  constant)
                 (operator           ;; Level 4
                  delimiter
                  bracket
                  number
-                 function-call
                  index-atom)))
 
   ;; Should we set this or let the user decide?
