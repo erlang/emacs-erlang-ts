@@ -201,11 +201,35 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
    :feature 'preprocessor
    :override t
    `((wild_attribute name: (_) @font-lock-preprocessor-face)
-     (pp_define lhs: (macro_lhs name: (_) @font-lock-preprocessor-face))
+     (module_attribute (["-" "module"]) @font-lock-preprocessor-face)
+     (behaviour_attribute (["-" "behaviour" "behavior"]) @font-lock-preprocessor-face)
+     (deprecated_attribute (["-" "deprecated"]) @font-lock-preprocessor-face)
+     (export_attribute (["-" "export"]) @font-lock-preprocessor-face)
+     (import_attribute (["-" "import"]) @font-lock-preprocessor-face)
+     (export_type_attribute (["-" "export_type"]) @font-lock-preprocessor-face)
+     (compile_options_attribute (["-" "compile"]) @font-lock-preprocessor-face)
+     (file_attribute (["-" "file"]) @font-lock-preprocessor-face)
+     (feature_attribute (["-" "feature"]) @font-lock-preprocessor-face)
+     (optional_callbacks_attribute (["-" "optional_callbacks"]) @font-lock-preprocessor-face)
+
+     (pp_define (["-" "define"]) @font-lock-preprocessor-face)
+     (pp_include (["-" "include"]) @font-lock-preprocessor-face)
+     (pp_include_lib (["-" "include_lib"]) @font-lock-preprocessor-face)
+     (pp_undef (["-" "undef"]) @font-lock-preprocessor-face)
+     (pp_ifdef (["-" "ifdef"]) @font-lock-preprocessor-face)
+     (pp_ifndef (["-" "ifndef"]) @font-lock-preprocessor-face)
+     (pp_else (["-" "else"]) @font-lock-preprocessor-face)
+     (pp_endif (["-" "endif"]) @font-lock-preprocessor-face)
+     (pp_if (["-" "if"]) @font-lock-preprocessor-face)
+     (pp_elif (["-" "elif"]) @font-lock-preprocessor-face)
+
+     (record_decl (["-" "record"]) @font-lock-preprocessor-face)
      (macro_call_expr name: (_) @font-lock-preprocessor-face)
-     (["module" "export" "import" "compile" "define" "record"
-       "spec" "type" "export_type" "opaque" "behaviour" "include" "include_lib"]
-      @font-lock-preprocessor-face))
+     (callback (["-" "callback"]) @font-lock-preprocessor-face)
+
+     (type_alias (["-" "type"]) @font-lock-preprocessor-face)
+     (opaque (["-" "opaque"]) @font-lock-preprocessor-face)
+     (spec (["-" "spec"]) @font-lock-preprocessor-face))
 
    :language 'erlang
    :feature 'constant
