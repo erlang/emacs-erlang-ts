@@ -155,16 +155,20 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
    :override t
    `(  ;; Might be slow but don't know a better way to do it
      (call expr: (_) @font-lock-type-face
-           (:pred erlang-ts-paren-is-type @font-lock-type-face))
+           (:pred erlang-ts-in-type-context-p @font-lock-type-face))
      (type_name name: (atom) @font-lock-type-face)
      (export_type_attribute types: (fa fun: (atom) @font-lock-type-face))
      (record_decl name: (atom) @font-lock-type-face
                   (record_field name: (atom) @font-lock-property-name-face))
+     ;; for records without fields e.g
+     ;; `-record(name, {}).`
+     (record_decl name: (atom) @font-lock-type-face)
      (record_name name: (atom) @font-lock-type-face))
 
    :language 'erlang
    :feature 'definition
    `((function_clause name: (atom) @font-lock-function-name-face)
+     (callback fun: (atom) @font-lock-function-name-face)
      (spec fun: (atom) @font-lock-function-name-face)
      (fa fun: (atom) @font-lock-function-name-face)
      (binary_op_expr lhs: (atom) @font-lock-function-name-face "/"
@@ -185,21 +189,59 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
                    (remote_module module: (atom)
                                   @module (:equal "erlang" @module))
                    fun: (atom) @fun (:match ,erlang-ext-bif-regexp @fun))
-           @font-lock-builtin-face))
+           @font-lock-builtin-face)
+     (call expr: (atom) @font-lock-builtin-face
+           (:match ,erlang-guards-regexp @font-lock-builtin-face)))
 
    :language 'erlang
    :feature 'preprocessor
    :override t
    `((wild_attribute name: (_) @font-lock-preprocessor-face)
-     (pp_define lhs: (macro_lhs name: (_) @font-lock-preprocessor-face))
+     (module_attribute (["-" "module"]) @font-lock-preprocessor-face)
+     (behaviour_attribute (["-" "behaviour" "behavior"]) @font-lock-preprocessor-face)
+     (deprecated_attribute (["-" "deprecated"]) @font-lock-preprocessor-face)
+     (export_attribute (["-" "export"]) @font-lock-preprocessor-face)
+     (import_attribute (["-" "import"]) @font-lock-preprocessor-face)
+     (export_type_attribute (["-" "export_type"]) @font-lock-preprocessor-face)
+     (compile_options_attribute (["-" "compile"]) @font-lock-preprocessor-face)
+     (file_attribute (["-" "file"]) @font-lock-preprocessor-face)
+     (feature_attribute (["-" "feature"]) @font-lock-preprocessor-face)
+     (optional_callbacks_attribute (["-" "optional_callbacks"]) @font-lock-preprocessor-face)
+
+     (pp_define (["-" "define"]) @font-lock-preprocessor-face)
+     (pp_include (["-" "include"]) @font-lock-preprocessor-face)
+     (pp_include_lib (["-" "include_lib"]) @font-lock-preprocessor-face)
+     (pp_undef (["-" "undef"]) @font-lock-preprocessor-face)
+     (pp_ifdef (["-" "ifdef"]) @font-lock-preprocessor-face)
+     (pp_ifndef (["-" "ifndef"]) @font-lock-preprocessor-face)
+     (pp_else (["-" "else"]) @font-lock-preprocessor-face)
+     (pp_endif (["-" "endif"]) @font-lock-preprocessor-face)
+     (pp_if (["-" "if"]) @font-lock-preprocessor-face)
+     (pp_elif (["-" "elif"]) @font-lock-preprocessor-face)
+
+     (record_decl (["-" "record"]) @font-lock-preprocessor-face)
      (macro_call_expr name: (_) @font-lock-preprocessor-face)
-     (["module" "export" "import" "compile" "define" "record"
-       "spec" "type" "export_type" "opaque" "behaviour" "include" "include_lib"]
-      @font-lock-preprocessor-face))
+     (callback (["-" "callback"]) @font-lock-preprocessor-face)
+
+     (type_alias (["-" "type"]) @font-lock-preprocessor-face)
+     (opaque (["-" "opaque"]) @font-lock-preprocessor-face)
+     (spec (["-" "spec"]) @font-lock-preprocessor-face))
 
    :language 'erlang
    :feature 'constant
-   `(((atom) @font-lock-constant-face (:match "^'.*" @font-lock-constant-face))
+   :override t
+   `((module_attribute name: (atom) @font-lock-constant-face)
+     (behaviour_attribute name: (_) @font-lock-constant-face)
+
+     (pp_define lhs: (macro_lhs name: (_) @font-lock-constant-face))
+     (pp_undef name: (_) @font-lock-constant-face)
+     (pp_ifdef name: (_) @font-lock-constant-face)
+     (pp_ifndef name: (_) @font-lock-constant-face)
+
+     (macro_call_expr name: (var) @font-lock-constant-face
+                      (:pred erlang-ts-predefined-macro-p @font-lock-constant-face))
+
+     ((atom) @font-lock-constant-face (:match "^'.*" @font-lock-constant-face))
      ((char) @font-lock-constant-face (:match "^$.*" @font-lock-constant-face)))
 
    :language 'erlang
@@ -219,7 +261,12 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
 
    :language 'erlang
    :feature 'function-call
-   `((call expr:  (_) @font-lock-function-call-face))
+   `(
+     (call expr: (atom) @font-lock-function-call-face)
+     (call expr: (remote module: (remote_module module: (atom) @font-lock-constant-face)
+                         fun: (atom) @font-lock-function-call-face))
+     (call expr: (remote fun: (atom) @font-lock-function-call-face))
+     (remote module: (remote_module module: (atom) @font-lock-constant-face)))
 
    :language 'erlang
    :feature 'bracket
@@ -240,15 +287,27 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
 Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
  to change settings")
 
-(defun erlang-ts-paren-is-type (node)
-  "Check if any parent of NODE is a type."
-  (let ((type (treesit-node-type node)))
-    (cond ((member type '("type_alias" "ann_type" "type_sig"
-                          "opaque" "field_type"))
-           t)
-          ((not type) nil)
-          (t
-           (erlang-ts-paren-is-type (treesit-node-parent node))))))
+(defun erlang-ts-in-type-context-p (node)
+  "Check if NODE is within a type definition context."
+  (when node
+    (let ((parent (treesit-node-parent node)))
+      (cond
+       ((null parent) nil)
+       ((member (treesit-node-type parent)
+                '("type_alias" "ann_type" "type_sig" "opaque" "field_type")) t)
+       (t (erlang-ts-in-type-context-p parent))))))
+
+(defun erlang-ts-predefined-macro-p (node)
+  "Check if macro_call_expr var NODE is a builtin macro."
+  (when node
+    (if (member (treesit-node-text node)
+                '("OTP_RELEASE" "MACHINE"
+                  "MODULE" "MODULE_STRING"
+                  "FILE" "LINE"
+                  "FUNCTION_NAME" "FUNCTION_ARITY"
+                  "FEATURE_AVAILABLE" "FEATURE_ENABLED"))
+        t
+      nil)))
 
 (defun erlang-ts-setup ()
   "Setup treesit for erlang."
@@ -269,12 +328,12 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
                 (builtin            ;; Level 3
                  variable
                  guards
+                 function-call
                  constant)
                 (operator           ;; Level 4
                  delimiter
                  bracket
                  number
-                 function-call
                  index-atom)))
 
   ;; Should we set this or let the user decide?
