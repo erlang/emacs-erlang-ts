@@ -237,8 +237,8 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
    `((macro_call_expr name: (var) @font-lock-constant-face
                       (:pred erlang-ts-predefined-macro-p @font-lock-constant-face))
 
-     ((atom) @font-lock-constant-face (:match "^'.*" @font-lock-constant-face))
-     ((char) @font-lock-constant-face (:match "^$.*" @font-lock-constant-face)))
+     ((atom) @font-lock-constant-face (:match ,erlang-atom-quoted-regexp @font-lock-constant-face))
+     ((char) @font-lock-constant-face))
 
    :language 'erlang
    :feature  'index-atom
@@ -305,6 +305,84 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
         t
       nil)))
 
+(defvar erlang-ts--syntax-propertize-query
+  (when (treesit-available-p)
+    (treesit-query-compile
+     'erlang
+     '(((char) @node-char)
+       ((atom) @node-atom)
+       ((string) @node-string-triple-quoted (:match "^\"\"\"" @node-string-triple-quoted))
+       ((string) @node-string)))))
+
+(defun erlang-ts--process-node (node)
+  "Process a single or double quoted string or atom node.
+NODE is the treesit node to process."
+  (let* ((node-text (treesit-node-text node))
+         (node-start (treesit-node-start node))
+         (node-end (treesit-node-end node))
+         (first-char (aref node-text 0))
+         (last-char (aref node-text (1- (length node-text)))))
+    (when (and (or (eq first-char ?\") (eq first-char ?\'))
+               (eq first-char last-char))
+      (let ((escaped-last-quote (and (eq last-char ?\")
+                                    (> (length node-text) 1)
+                                    (eq (aref node-text (- (length node-text) 2)) ?\\))))
+        (put-text-property node-start (1+ node-start) 'syntax-table (string-to-syntax "|"))
+        (put-text-property (1- node-end) node-end 'syntax-table (string-to-syntax "|"))
+        (unless escaped-last-quote
+          (put-text-property (1- node-end) node-end 'syntax-table (string-to-syntax "|")))
+        (let ((content-start (1+ node-start))
+              (content-end (1- node-end)))
+          (when (> content-end content-start)
+            (put-text-property content-start content-end 'syntax-table (syntax-table))))))))
+
+(defun erlang-ts--process-node-char (node)
+  "Process char NODE like `$\'' or `$\"'."
+  (let* ((node-start (treesit-node-start node))
+         (node-end (treesit-node-end node)))
+    (when (> node-end node-start)
+      (let ((custom-table (copy-syntax-table (syntax-table))))
+        (modify-syntax-entry ?' "w" custom-table)
+        (modify-syntax-entry ?\" "w" custom-table)
+        (put-text-property node-start node-end 'syntax-table custom-table)))))
+
+(defun erlang-ts--process-node-triple-quoted (node)
+  "Process a triple quoted string node.
+NODE is the treesit node to process."
+  (let* ((node-text (treesit-node-text node))
+         (node-start (treesit-node-start node))
+         (node-end (treesit-node-end node))
+         (text-length (length node-text)))
+    (put-text-property node-start (+ node-start 3) 'syntax-table (string-to-syntax "|"))
+    (when (>= text-length 3)
+      (put-text-property (- node-end 3) node-end 'syntax-table (string-to-syntax "|")))
+    (let ((content-start (+ node-start 3))
+          (content-end (- node-end 3)))
+      (when (> content-end content-start)
+        (put-text-property content-start content-end 'syntax-table (syntax-table))))))
+
+(defun erlang-ts--syntax-propertize (start end)
+  "Apply syntax properties for Erlang specific patterns from START to END."
+  (let ((captures
+         (treesit-query-capture 'erlang erlang-ts--syntax-propertize-query start end)))
+    (pcase-dolist (`(,name . ,node) captures)
+      (pcase name
+        ('node-char   (erlang-ts--process-node-char node))
+        ('node-atom   (erlang-ts--process-node node))
+        ('node-string (erlang-ts--process-node node))
+        ('node-string-triple-quoted (erlang-ts--process-node-triple-quoted node))))))
+
+(defvar erlang-ts-mode-syntax-table nil
+  "Syntax table in use in Erlang-ts-mode buffers.")
+
+(defun erlang-ts-syntax-table-init ()
+  "Initialize the syntax table for `erlang-ts-mode'."
+  (unless erlang-ts-mode-syntax-table
+    (let ((table (copy-syntax-table erlang-mode-syntax-table)))
+      (modify-syntax-entry ?$ "w" table)
+      (setq erlang-ts-mode-syntax-table table)))
+  (set-syntax-table erlang-ts-mode-syntax-table))
+
 (defun erlang-ts-setup ()
   "Setup treesit for erlang."
 
@@ -361,7 +439,8 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
   (advice-add #'erlang-font-lock-level-3 :around #'erlang-ts--font-lock-level-3)
   (advice-add #'erlang-font-lock-level-4 :around #'erlang-ts--font-lock-level-4)
 
-  (treesit-major-mode-setup))
+  (treesit-major-mode-setup)
+  (setq-local syntax-propertize-function #'erlang-ts--syntax-propertize))
 
 
 (defun erlang-ts-unload-function ()
@@ -381,7 +460,8 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
 ;;;###autoload
 (define-derived-mode erlang-ts-mode erlang-mode "erl-ts"
   "Major mode for editing erlang with tree-sitter."
-  :syntax-table erlang-mode-syntax-table
+  :syntax-table nil
+  (erlang-ts-syntax-table-init)
   (when (treesit-ready-p 'erlang)
     (treesit-parser-create 'erlang)
     (erlang-ts-setup)))
