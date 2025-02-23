@@ -241,8 +241,10 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
      (macro_call_expr name: (var) @font-lock-constant-face
                       (:pred erlang-ts-predefined-macro-p @font-lock-constant-face))
 
-     ((atom) @font-lock-constant-face (:match "^'.*" @font-lock-constant-face))
-     ((char) @font-lock-constant-face (:match "^$.*" @font-lock-constant-face)))
+     ((atom) @font-lock-constant-face (:match ,erlang-atom-quoted-regexp @font-lock-constant-face))
+     ((char) @font-lock-constant-face
+      (:match "\\(\\$\\([^\\]\\|\\\\\\([^0-7^\n]\\|[0-7]+\\|\\^[a-zA-Z]\\)\\)\\)"
+              @font-lock-constant-face)))
 
    :language 'erlang
    :feature  'index-atom
