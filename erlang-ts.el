@@ -168,6 +168,7 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
    :language 'erlang
    :feature 'definition
    `((function_clause name: (atom) @font-lock-function-name-face)
+     (callback fun: (atom) @font-lock-function-name-face)
      (spec fun: (atom) @font-lock-function-name-face)
      (fa fun: (atom) @font-lock-function-name-face)
      (binary_op_expr lhs: (atom) @font-lock-function-name-face "/"
