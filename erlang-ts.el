@@ -233,7 +233,11 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
 
    :language 'erlang
    :feature 'constant
-   `(((atom) @font-lock-constant-face (:match "^'.*" @font-lock-constant-face))
+   :override t
+   `((macro_call_expr name: (var) @font-lock-constant-face
+                      (:pred erlang-ts-predefined-macro-p @font-lock-constant-face))
+
+     ((atom) @font-lock-constant-face (:match "^'.*" @font-lock-constant-face))
      ((char) @font-lock-constant-face (:match "^$.*" @font-lock-constant-face)))
 
    :language 'erlang
@@ -288,6 +292,18 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
        ((member (treesit-node-type parent)
                 '("type_alias" "ann_type" "type_sig" "opaque" "field_type")) t)
        (t (erlang-ts-in-type-context-p parent))))))
+
+(defun erlang-ts-predefined-macro-p (node)
+  "Check if macro_call_expr var NODE is a builtin macro."
+  (when node
+    (if (member (treesit-node-text node)
+                '("OTP_RELEASE" "MACHINE"
+                  "MODULE" "MODULE_STRING"
+                  "FILE" "LINE"
+                  "FUNCTION_NAME" "FUNCTION_ARITY"
+                  "FEATURE_AVAILABLE" "FEATURE_ENABLED"))
+        t
+      nil)))
 
 (defun erlang-ts-setup ()
   "Setup treesit for erlang."
