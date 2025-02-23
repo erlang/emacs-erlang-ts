@@ -311,6 +311,28 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
         t
       nil)))
 
+(defvar erlang-ts--syntax-propertize-query
+  (when (treesit-available-p)
+    (treesit-query-compile
+     'erlang
+     '(((atom) @node-atom)
+       ((string) @node-string)))))
+
+(defun erlang-ts--process-node (node)
+  "Apply syntax-descriptor as `w' for atom or normal string NODE."
+  (let* ((string-start (1+ (treesit-node-start node)))
+         (string-end (1- (treesit-node-end node))))
+    (put-text-property string-start string-end 'syntax-table (string-to-syntax "w"))))
+
+(defun erlang-ts--syntax-propertize (start end)
+  "Apply syntax properties for Erlang specific patterns from START to END."
+  (let ((captures
+         (treesit-query-capture 'erlang erlang-ts--syntax-propertize-query start end)))
+    (pcase-dolist (`(,name . ,node) captures)
+      (pcase name
+        ('node-atom   (erlang-ts--process-node node))
+        ('node-string (erlang-ts--process-node node))))))
+
 (defun erlang-ts-setup ()
   "Setup treesit for erlang."
 
@@ -367,7 +389,8 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
   (advice-add #'erlang-font-lock-level-3 :around #'erlang-ts--font-lock-level-3)
   (advice-add #'erlang-font-lock-level-4 :around #'erlang-ts--font-lock-level-4)
 
-  (treesit-major-mode-setup))
+  (treesit-major-mode-setup)
+  (setq-local syntax-propertize-function #'erlang-ts--syntax-propertize))
 
 
 (defun erlang-ts-unload-function ()
