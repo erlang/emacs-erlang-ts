@@ -160,6 +160,9 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
      (export_type_attribute types: (fa fun: (atom) @font-lock-type-face))
      (record_decl name: (atom) @font-lock-type-face
                   (record_field name: (atom) @font-lock-property-name-face))
+     ;; for records without fields e.g
+     ;; `-record(name, {}).`
+     (record_decl name: (atom) @font-lock-type-face)
      (record_name name: (atom) @font-lock-type-face))
 
    :language 'erlang
