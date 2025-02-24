@@ -173,7 +173,11 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
      (fa fun: (atom) @font-lock-function-name-face)
      (binary_op_expr lhs: (atom) @font-lock-function-name-face "/"
                      rhs: (integer))
-     (internal_fun fun: (atom) @font-lock-function-name-face))
+     (internal_fun fun: (atom) @font-lock-function-name-face)
+     (external_fun module: (module name: (atom) @font-lock-constant-face)
+                   fun: (atom) @font-lock-function-name-face)
+     (external_fun module: (module name: (atom) @font-lock-constant-face))
+     (external_fun fun: (atom) @font-lock-function-name-face))
 
    :language 'erlang
    :feature 'guards
