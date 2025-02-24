@@ -316,13 +316,49 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
     (treesit-query-compile
      'erlang
      '(((atom) @node-atom)
+       ((string) @node-string-triple-quoted (:match "^\"\"\"" @node-string-triple-quoted))
        ((string) @node-string)))))
 
 (defun erlang-ts--process-node (node)
-  "Apply syntax-descriptor as `w' for atom or normal string NODE."
-  (let* ((string-start (1+ (treesit-node-start node)))
-         (string-end (1- (treesit-node-end node))))
-    (put-text-property string-start string-end 'syntax-table (string-to-syntax "w"))))
+  "Process a single or double quoted string or atom node.
+NODE is the treesit node to process."
+  (let* ((node-text (treesit-node-text node))
+         (node-start (treesit-node-start node))
+         (node-end (treesit-node-end node))
+         (first-char (aref node-text 0))
+         (last-char (aref node-text (1- (length node-text)))))
+    (when (and (or (eq first-char ?\") (eq first-char ?\'))
+               (eq first-char last-char))
+      (let ((escaped-last-quote (and (eq last-char ?\")
+                                    (> (length node-text) 1)
+                                    (eq (aref node-text (- (length node-text) 2)) ?\\))))
+        (put-text-property node-start (1+ node-start) 'syntax-table (string-to-syntax "|"))
+        (put-text-property (1- node-end) node-end 'syntax-table (string-to-syntax "|"))
+        (unless escaped-last-quote
+          (put-text-property (1- node-end) node-end 'syntax-table (string-to-syntax "|")))
+        (let ((content-start (1+ node-start))
+              (content-end (1- node-end)))
+          (when (> content-end content-start)
+            (let ((custom-table (copy-syntax-table (syntax-table))))
+              (modify-syntax-entry ?$ "w" custom-table)
+              (put-text-property content-start content-end 'syntax-table custom-table))))))))
+
+(defun erlang-ts--process-node-triple-quoted (node)
+  "Process a triple quoted string node.
+NODE is the treesit node to process."
+  (let* ((node-text (treesit-node-text node))
+         (node-start (treesit-node-start node))
+         (node-end (treesit-node-end node))
+         (text-length (length node-text)))
+    (put-text-property node-start (+ node-start 3) 'syntax-table (string-to-syntax "|"))
+    (when (>= text-length 3)
+      (put-text-property (- node-end 3) node-end 'syntax-table (string-to-syntax "|")))
+    (let ((content-start (+ node-start 3))
+          (content-end (- node-end 3)))
+      (when (> content-end content-start)
+        (let ((custom-table (copy-syntax-table (syntax-table))))
+          (modify-syntax-entry ?$ "w" custom-table)
+          (put-text-property content-start content-end 'syntax-table custom-table))))))
 
 (defun erlang-ts--syntax-propertize (start end)
   "Apply syntax properties for Erlang specific patterns from START to END."
@@ -331,7 +367,8 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
     (pcase-dolist (`(,name . ,node) captures)
       (pcase name
         ('node-atom   (erlang-ts--process-node node))
-        ('node-string (erlang-ts--process-node node))))))
+        ('node-string (erlang-ts--process-node node))
+        ('node-string-triple-quoted (erlang-ts--process-node-triple-quoted node))))))
 
 (defun erlang-ts-setup ()
   "Setup treesit for erlang."
