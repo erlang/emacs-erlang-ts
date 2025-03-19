@@ -244,9 +244,7 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
                       (:pred erlang-ts-predefined-macro-p @font-lock-constant-face))
 
      ((atom) @font-lock-constant-face (:match ,erlang-atom-quoted-regexp @font-lock-constant-face))
-     ((char) @font-lock-constant-face
-      (:match "\\(\\$\\([^\\]\\|\\\\\\([^0-7^\n]\\|[0-7]+\\|\\^[a-zA-Z]\\)\\)\\)"
-              @font-lock-constant-face)))
+     ((char) @font-lock-constant-face))
 
    :language 'erlang
    :feature  'index-atom
@@ -317,7 +315,8 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
   (when (treesit-available-p)
     (treesit-query-compile
      'erlang
-     '(((atom) @node-atom)
+     '(((char) @node-char)
+       ((atom) @node-atom)
        ((string) @node-string-triple-quoted (:match "^\"\"\"" @node-string-triple-quoted))
        ((string) @node-string)))))
 
@@ -341,9 +340,18 @@ NODE is the treesit node to process."
         (let ((content-start (1+ node-start))
               (content-end (1- node-end)))
           (when (> content-end content-start)
-            (let ((custom-table (copy-syntax-table (syntax-table))))
-              (modify-syntax-entry ?$ "w" custom-table)
-              (put-text-property content-start content-end 'syntax-table custom-table))))))))
+            (put-text-property content-start content-end 'syntax-table (syntax-table))))))))
+
+(defun erlang-ts--process-node-char (node)
+  "Process char NODE like `$\'' or `$\"'."
+  (let* ((node-start (treesit-node-start node))
+         (node-end (treesit-node-end node)))
+    (message "modify char node")
+    (when (> node-end node-start)
+      (let ((custom-table (copy-syntax-table (syntax-table))))
+        (modify-syntax-entry ?' "w" custom-table)
+        (modify-syntax-entry ?\" "w" custom-table)
+        (put-text-property node-start node-end 'syntax-table custom-table)))))
 
 (defun erlang-ts--process-node-triple-quoted (node)
   "Process a triple quoted string node.
@@ -358,9 +366,7 @@ NODE is the treesit node to process."
     (let ((content-start (+ node-start 3))
           (content-end (- node-end 3)))
       (when (> content-end content-start)
-        (let ((custom-table (copy-syntax-table (syntax-table))))
-          (modify-syntax-entry ?$ "w" custom-table)
-          (put-text-property content-start content-end 'syntax-table custom-table))))))
+        (put-text-property content-start content-end 'syntax-table (syntax-table))))))
 
 (defun erlang-ts--syntax-propertize (start end)
   "Apply syntax properties for Erlang specific patterns from START to END."
@@ -368,9 +374,21 @@ NODE is the treesit node to process."
          (treesit-query-capture 'erlang erlang-ts--syntax-propertize-query start end)))
     (pcase-dolist (`(,name . ,node) captures)
       (pcase name
+        ('node-char   (erlang-ts--process-node-char node))
         ('node-atom   (erlang-ts--process-node node))
         ('node-string (erlang-ts--process-node node))
         ('node-string-triple-quoted (erlang-ts--process-node-triple-quoted node))))))
+
+(defvar erlang-ts-mode-syntax-table nil
+  "Syntax table in use in Erlang-ts-mode buffers.")
+
+(defun erlang-ts-syntax-table-init ()
+  "Initialize the syntax table for `erlang-ts-mode'."
+  (unless erlang-ts-mode-syntax-table
+    (let ((table (copy-syntax-table erlang-mode-syntax-table)))
+      (modify-syntax-entry ?$ "w" table)
+      (setq erlang-ts-mode-syntax-table table)))
+  (set-syntax-table erlang-ts-mode-syntax-table))
 
 (defun erlang-ts-setup ()
   "Setup treesit for erlang."
@@ -449,7 +467,8 @@ NODE is the treesit node to process."
 ;;;###autoload
 (define-derived-mode erlang-ts-mode erlang-mode "erl-ts"
   "Major mode for editing erlang with tree-sitter."
-  :syntax-table erlang-mode-syntax-table
+  :syntax-table nil
+  (erlang-ts-syntax-table-init)
   (when (treesit-ready-p 'erlang)
     (treesit-parser-create 'erlang)
     (erlang-ts-setup)))
