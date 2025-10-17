@@ -174,10 +174,8 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
      (binary_op_expr lhs: (atom) @font-lock-function-name-face "/"
                      rhs: (integer))
      (internal_fun fun: (atom) @font-lock-function-name-face)
-     (external_fun module: (module name: (atom) @font-lock-constant-face)
-                   fun: (atom) @font-lock-function-name-face)
-     (external_fun module: (module name: (atom) @font-lock-constant-face))
-     (external_fun fun: (atom) @font-lock-function-name-face))
+     (external_fun module: (module name: (atom) @font-lock-function-name-face)
+                   fun: (atom) @font-lock-function-name-face))
 
    :language 'erlang
    :feature 'guards
@@ -256,17 +254,20 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
    `((var) @font-lock-variable-name-face)
 
    :language 'erlang
-   :feature 'function-call
-   `(
-     (call expr: (atom) @font-lock-function-call-face)
-     (call expr: (remote module: (remote_module module: (atom) @font-lock-constant-face)
-                         fun: (atom) @font-lock-function-call-face))
-     (call expr: (remote fun: (atom) @font-lock-function-call-face))
+   :feature 'remote-module
+   :override t
+   `((call expr: (remote module: (remote_module module: (atom) @font-lock-constant-face)
+                         fun: (atom) @font-lock-function-name-face))
+     (external_fun module: (module name: (atom) @font-lock-constant-face))
      (remote module: (remote_module module: (atom) @font-lock-constant-face)))
 
    :language 'erlang
+   :feature 'function-call
+   `((call expr:  (_) @font-lock-function-call-face))
+
+   :language 'erlang
    :feature 'bracket
-   '((["(" ")" "[" "]" "{"  "{" "}" "<<" ">>"]) @font-lock-bracket-face)
+   '((["(" ")" "[" "]" "{" "}" "<<" ">>"]) @font-lock-bracket-face)
 
    :language 'erlang
    :feature 'delimiter
@@ -405,6 +406,7 @@ NODE is the treesit node to process."
                  function-call
                  constant)
                 (operator           ;; Level 4
+                 remote-module
                  delimiter
                  bracket
                  number
