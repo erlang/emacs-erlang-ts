@@ -23,7 +23,7 @@ Add to your .emacs file:
      :mode ("\\.erl\\'" . erlang-ts-mode)
      :defer 't)
 ```
-Install/compile erlang treesitter support (first time only):
+Install/compile erlang treesitter support (first time or update treesitter grammer):
 
 ```
   M-x treesit-install-language-grammar

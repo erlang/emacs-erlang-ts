@@ -23,7 +23,7 @@
 ;; Keywords: erlang, languages, treesitter
 ;; URL: https://github.com/erlang/emacs-erlang-ts
 ;; Package-Requires: ((emacs "29.2") (erlang "27.2"))
-;; Package-Version: 0.2
+;; Package-Version: 0.3
 
 ;;; Commentary:
 
@@ -46,7 +46,7 @@
 ;;      :mode ("\\.erl\\'" . erlang-ts-mode)
 ;;      :defer 't)
 ;; ```
-;; Install/compile erlang treesitter support (first time only):
+;; Install/compile erlang treesitter support (first time or upgrade grammer):
 ;;
 ;; ```
 ;;   M-x treesit-install-language-grammar
@@ -275,9 +275,9 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
 
    :language 'erlang
    :feature 'operator
-   ;; Add "<:-" "<:=" "&&"  when available in tree-sitter
    '(([ "->" "||" "<-" "<=" "+" "-" "*" "/" "++"
-        ">" ">=" "<" "=<" "=" "==" "=:=" "=/="])
+        ">" ">=" "<" "=<" "=" "==" "=:=" "=/="
+        "<:-" "<:=" "&&"])
      @font-lock-operator-face))
 
   "Tree-sitter font-lock settings for `erlang-ts-mode'.
