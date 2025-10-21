@@ -23,7 +23,7 @@
 ;; Keywords: erlang, languages, treesitter
 ;; URL: https://github.com/erlang/emacs-erlang-ts
 ;; Package-Requires: ((emacs "29.2") (erlang "27.2"))
-;; Package-Version: 0.2
+;; Package-Version: 0.3
 
 ;;; Commentary:
 
@@ -46,7 +46,7 @@
 ;;      :mode ("\\.erl\\'" . erlang-ts-mode)
 ;;      :defer 't)
 ;; ```
-;; Install/compile erlang treesitter support (first time only):
+;; Install/compile erlang treesitter support (first time or upgrade grammer):
 ;;
 ;; ```
 ;;   M-x treesit-install-language-grammar
@@ -155,21 +155,27 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
    :override t
    `(  ;; Might be slow but don't know a better way to do it
      (call expr: (_) @font-lock-type-face
-           (:pred erlang-ts-paren-is-type @font-lock-type-face))
+           (:pred erlang-ts-in-type-context-p @font-lock-type-face))
      (type_name name: (atom) @font-lock-type-face)
      (export_type_attribute types: (fa fun: (atom) @font-lock-type-face))
      (record_decl name: (atom) @font-lock-type-face
                   (record_field name: (atom) @font-lock-property-name-face))
+     ;; for records without fields e.g
+     ;; `-record(name, {}).`
+     (record_decl name: (atom) @font-lock-type-face)
      (record_name name: (atom) @font-lock-type-face))
 
    :language 'erlang
    :feature 'definition
    `((function_clause name: (atom) @font-lock-function-name-face)
+     (callback fun: (atom) @font-lock-function-name-face)
      (spec fun: (atom) @font-lock-function-name-face)
      (fa fun: (atom) @font-lock-function-name-face)
      (binary_op_expr lhs: (atom) @font-lock-function-name-face "/"
                      rhs: (integer))
-     (internal_fun fun: (atom) @font-lock-function-name-face))
+     (internal_fun fun: (atom) @font-lock-function-name-face)
+     (external_fun module: (module name: (atom) @font-lock-function-name-face)
+                   fun: (atom) @font-lock-function-name-face))
 
    :language 'erlang
    :feature 'guards
@@ -185,22 +191,52 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
                    (remote_module module: (atom)
                                   @module (:equal "erlang" @module))
                    fun: (atom) @fun (:match ,erlang-ext-bif-regexp @fun))
-           @font-lock-builtin-face))
+           @font-lock-builtin-face)
+     (call expr: (atom) @font-lock-builtin-face
+           (:match ,erlang-guards-regexp @font-lock-builtin-face)))
 
    :language 'erlang
    :feature 'preprocessor
    :override t
    `((wild_attribute name: (_) @font-lock-preprocessor-face)
-     (pp_define lhs: (macro_lhs name: (_) @font-lock-preprocessor-face))
+     (module_attribute (["-" "module"]) @font-lock-preprocessor-face)
+     (behaviour_attribute (["-" "behaviour" "behavior"]) @font-lock-preprocessor-face)
+     (deprecated_attribute (["-" "deprecated"]) @font-lock-preprocessor-face)
+     (export_attribute (["-" "export"]) @font-lock-preprocessor-face)
+     (import_attribute (["-" "import"]) @font-lock-preprocessor-face)
+     (export_type_attribute (["-" "export_type"]) @font-lock-preprocessor-face)
+     (compile_options_attribute (["-" "compile"]) @font-lock-preprocessor-face)
+     (file_attribute (["-" "file"]) @font-lock-preprocessor-face)
+     (feature_attribute (["-" "feature"]) @font-lock-preprocessor-face)
+     (optional_callbacks_attribute (["-" "optional_callbacks"]) @font-lock-preprocessor-face)
+
+     (pp_define (["-" "define"]) @font-lock-preprocessor-face)
+     (pp_include (["-" "include"]) @font-lock-preprocessor-face)
+     (pp_include_lib (["-" "include_lib"]) @font-lock-preprocessor-face)
+     (pp_undef (["-" "undef"]) @font-lock-preprocessor-face)
+     (pp_ifdef (["-" "ifdef"]) @font-lock-preprocessor-face)
+     (pp_ifndef (["-" "ifndef"]) @font-lock-preprocessor-face)
+     (pp_else (["-" "else"]) @font-lock-preprocessor-face)
+     (pp_endif (["-" "endif"]) @font-lock-preprocessor-face)
+     (pp_if (["-" "if"]) @font-lock-preprocessor-face)
+     (pp_elif (["-" "elif"]) @font-lock-preprocessor-face)
+
+     (record_decl (["-" "record"]) @font-lock-preprocessor-face)
      (macro_call_expr name: (_) @font-lock-preprocessor-face)
-     (["module" "export" "import" "compile" "define" "record"
-       "spec" "type" "export_type" "opaque" "behaviour" "include" "include_lib"]
-      @font-lock-preprocessor-face))
+     (callback (["-" "callback"]) @font-lock-preprocessor-face)
+
+     (type_alias (["-" "type"]) @font-lock-preprocessor-face)
+     (opaque (["-" "opaque"]) @font-lock-preprocessor-face)
+     (spec (["-" "spec"]) @font-lock-preprocessor-face))
 
    :language 'erlang
    :feature 'constant
-   `(((atom) @font-lock-constant-face (:match "^'.*" @font-lock-constant-face))
-     ((char) @font-lock-constant-face (:match "^$.*" @font-lock-constant-face)))
+   :override t
+   `((macro_call_expr name: (var) @font-lock-constant-face
+                      (:pred erlang-ts-predefined-macro-p @font-lock-constant-face))
+
+     ((atom) @font-lock-constant-face (:match ,erlang-atom-quoted-regexp @font-lock-constant-face))
+     ((char) @font-lock-constant-face))
 
    :language 'erlang
    :feature  'index-atom
@@ -218,12 +254,20 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
    `((var) @font-lock-variable-name-face)
 
    :language 'erlang
+   :feature 'remote-module
+   :override t
+   `((call expr: (remote module: (remote_module module: (atom) @font-lock-constant-face)
+                         fun: (atom) @font-lock-function-name-face))
+     (external_fun module: (module name: (atom) @font-lock-constant-face))
+     (remote module: (remote_module module: (atom) @font-lock-constant-face)))
+
+   :language 'erlang
    :feature 'function-call
    `((call expr:  (_) @font-lock-function-call-face))
 
    :language 'erlang
    :feature 'bracket
-   '((["(" ")" "[" "]" "{"  "{" "}" "<<" ">>"]) @font-lock-bracket-face)
+   '((["(" ")" "[" "]" "{" "}" "<<" ">>"]) @font-lock-bracket-face)
 
    :language 'erlang
    :feature 'delimiter
@@ -231,24 +275,114 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
 
    :language 'erlang
    :feature 'operator
-   ;; Add "<:-" "<:=" "&&"  when available in tree-sitter
    '(([ "->" "||" "<-" "<=" "+" "-" "*" "/" "++"
-        ">" ">=" "<" "=<" "=" "==" "=:=" "=/="])
+        ">" ">=" "<" "=<" "=" "==" "=:=" "=/="
+        "<:-" "<:=" "&&"])
      @font-lock-operator-face))
 
   "Tree-sitter font-lock settings for `erlang-ts-mode'.
 Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
  to change settings")
 
-(defun erlang-ts-paren-is-type (node)
-  "Check if any parent of NODE is a type."
-  (let ((type (treesit-node-type node)))
-    (cond ((member type '("type_alias" "ann_type" "type_sig"
-                          "opaque" "field_type"))
-           t)
-          ((not type) nil)
-          (t
-           (erlang-ts-paren-is-type (treesit-node-parent node))))))
+(defun erlang-ts-in-type-context-p (node)
+  "Check if NODE is within a type definition context."
+  (when node
+    (let ((parent (treesit-node-parent node)))
+      (cond
+       ((null parent) nil)
+       ((member (treesit-node-type parent)
+                '("type_alias" "ann_type" "type_sig" "opaque" "field_type")) t)
+       (t (erlang-ts-in-type-context-p parent))))))
+
+(defun erlang-ts-predefined-macro-p (node)
+  "Check if macro_call_expr var NODE is a builtin macro."
+  (when node
+    (if (member (treesit-node-text node)
+                '("OTP_RELEASE" "MACHINE"
+                  "MODULE" "MODULE_STRING"
+                  "FILE" "LINE"
+                  "FUNCTION_NAME" "FUNCTION_ARITY"
+                  "FEATURE_AVAILABLE" "FEATURE_ENABLED"))
+        t
+      nil)))
+
+(defvar erlang-ts--syntax-propertize-query
+  (when (treesit-available-p)
+    (treesit-query-compile
+     'erlang
+     '(((char) @node-char)
+       ((atom) @node-atom)
+       ((string) @node-string-triple-quoted (:match "^\"\"\"" @node-string-triple-quoted))
+       ((string) @node-string)))))
+
+(defun erlang-ts--process-node (node)
+  "Process a single or double quoted string or atom node.
+NODE is the treesit node to process."
+  (let* ((node-text (treesit-node-text node))
+         (node-start (treesit-node-start node))
+         (node-end (treesit-node-end node))
+         (first-char (aref node-text 0))
+         (last-char (aref node-text (1- (length node-text)))))
+    (when (and (or (eq first-char ?\") (eq first-char ?\'))
+               (eq first-char last-char))
+      (let ((escaped-last-quote (and (eq last-char ?\")
+                                    (> (length node-text) 1)
+                                    (eq (aref node-text (- (length node-text) 2)) ?\\))))
+        (put-text-property node-start (1+ node-start) 'syntax-table (string-to-syntax "|"))
+        (put-text-property (1- node-end) node-end 'syntax-table (string-to-syntax "|"))
+        (unless escaped-last-quote
+          (put-text-property (1- node-end) node-end 'syntax-table (string-to-syntax "|")))
+        (let ((content-start (1+ node-start))
+              (content-end (1- node-end)))
+          (when (> content-end content-start)
+            (put-text-property content-start content-end 'syntax-table (syntax-table))))))))
+
+(defun erlang-ts--process-node-char (node)
+  "Process char NODE like `$\'' or `$\"'."
+  (let* ((node-start (treesit-node-start node))
+         (node-end (treesit-node-end node)))
+    (when (> node-end node-start)
+      (let ((custom-table (copy-syntax-table (syntax-table))))
+        (modify-syntax-entry ?' "w" custom-table)
+        (modify-syntax-entry ?\" "w" custom-table)
+        (put-text-property node-start node-end 'syntax-table custom-table)))))
+
+(defun erlang-ts--process-node-triple-quoted (node)
+  "Process a triple quoted string node.
+NODE is the treesit node to process."
+  (let* ((node-text (treesit-node-text node))
+         (node-start (treesit-node-start node))
+         (node-end (treesit-node-end node))
+         (text-length (length node-text)))
+    (put-text-property node-start (+ node-start 3) 'syntax-table (string-to-syntax "|"))
+    (when (>= text-length 3)
+      (put-text-property (- node-end 3) node-end 'syntax-table (string-to-syntax "|")))
+    (let ((content-start (+ node-start 3))
+          (content-end (- node-end 3)))
+      (when (> content-end content-start)
+        (put-text-property content-start content-end 'syntax-table (syntax-table))))))
+
+(defun erlang-ts--syntax-propertize (start end)
+  "Apply syntax properties for Erlang specific patterns from START to END."
+  (let ((captures
+         (treesit-query-capture 'erlang erlang-ts--syntax-propertize-query start end)))
+    (pcase-dolist (`(,name . ,node) captures)
+      (pcase name
+        ('node-char   (erlang-ts--process-node-char node))
+        ('node-atom   (erlang-ts--process-node node))
+        ('node-string (erlang-ts--process-node node))
+        ('node-string-triple-quoted (erlang-ts--process-node-triple-quoted node))))))
+
+(defvar erlang-ts-mode-syntax-table nil
+  "Syntax table in use in Erlang-ts-mode buffers.")
+
+(defun erlang-ts-syntax-table-init ()
+  "Initialize the syntax table for `erlang-ts-mode'."
+  (unless erlang-ts-mode-syntax-table
+    (let ((table (copy-syntax-table erlang-mode-syntax-table)))
+      (modify-syntax-entry ?$ "w" table)
+      (setq erlang-ts-mode-syntax-table table)))
+  (set-syntax-table erlang-ts-mode-syntax-table))
 
 (defun erlang-ts-setup ()
   "Setup treesit for erlang."
@@ -269,12 +403,13 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
                 (builtin            ;; Level 3
                  variable
                  guards
+                 function-call
                  constant)
                 (operator           ;; Level 4
+                 remote-module
                  delimiter
                  bracket
                  number
-                 function-call
                  index-atom)))
 
   ;; Should we set this or let the user decide?
@@ -306,7 +441,8 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
   (advice-add #'erlang-font-lock-level-3 :around #'erlang-ts--font-lock-level-3)
   (advice-add #'erlang-font-lock-level-4 :around #'erlang-ts--font-lock-level-4)
 
-  (treesit-major-mode-setup))
+  (treesit-major-mode-setup)
+  (setq-local syntax-propertize-function #'erlang-ts--syntax-propertize))
 
 
 (defun erlang-ts-unload-function ()
@@ -326,7 +462,8 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
 ;;;###autoload
 (define-derived-mode erlang-ts-mode erlang-mode "erl-ts"
   "Major mode for editing erlang with tree-sitter."
-  :syntax-table erlang-mode-syntax-table
+  :syntax-table nil
+  (erlang-ts-syntax-table-init)
   (when (treesit-ready-p 'erlang)
     (treesit-parser-create 'erlang)
     (erlang-ts-setup)))
