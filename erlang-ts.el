@@ -384,6 +384,54 @@ NODE is the treesit node to process."
       (setq erlang-ts-mode-syntax-table table)))
   (set-syntax-table erlang-ts-mode-syntax-table))
 
+;;  imenu support
+
+(defun erlang-ts-imenu-node-func-p (node)
+  "Check if NODE is the first function clause."
+  (when-let ((prev (treesit-node-prev-sibling node)))
+    (not (and (equal (treesit-node-type prev) "fun_decl")
+              (equal (erlang-ts-imenu-func-name prev)
+                     (erlang-ts-imenu-func-name node))))))
+
+(defun erlang-ts-imenu-func-name (node)
+  "Fetch function name at NODE."
+  (let* ((clause (treesit-node-child-by-field-name node "clause"))
+         (name (treesit-node-text (treesit-node-child-by-field-name clause "name")))
+         (args (treesit-node-child-by-field-name clause "args")))
+    (format "%s/%s" name (treesit-node-child-count args "args"))))
+
+(defun erlang-ts-imenu-pp-name (node)
+  "Fetch macro name at NODE."
+  (let* ((lhs (treesit-node-child-by-field-name node "lhs"))
+         (name (treesit-node-text (treesit-node-child-by-field-name lhs "name")))
+         (args (treesit-node-child-by-field-name lhs "args")))
+    (if args (format "%s/%d" name (treesit-node-child-count args "args"))
+      name)))
+
+(defun erlang-ts-imenu-record-name (node)
+  "Fetch record name at NODE."
+  (let ((name (treesit-node-text (treesit-node-child-by-field-name node "name"))))
+    (format "#%s{}" name )))
+
+(defun erlang-ts-imenu-type-name (node)
+  "Fetch type name at NODE."
+  (treesit-node-text
+   (treesit-node-child-by-field-name
+    (treesit-node-child-by-field-name node "name") "name")))
+
+(defun erlang-ts-imenu-setup ()
+  "Setup imenu functions.
+This conflicts with lsp's imenu functionality if lsp is used
+Use (setq lsp-enable-imenu nil) to disable lsp-imenu"
+  (setq-local
+   treesit-simple-imenu-settings
+   '(
+     ("macros" "\\`pp_define\\'" nil erlang-ts-imenu-pp-name)
+     ("records" "\\`record_decl\\'" nil erlang-ts-imenu-record-name)
+     ("types" "\\`type_alias\\'" nil erlang-ts-imenu-type-name)
+     ("functions" "\\`fun_decl\\'" erlang-ts-imenu-node-func-p erlang-ts-imenu-func-name)
+     )))
+
 (defun erlang-ts-setup ()
   "Setup treesit for erlang."
 
@@ -440,6 +488,8 @@ NODE is the treesit node to process."
   (advice-add #'erlang-font-lock-level-2 :around #'erlang-ts--font-lock-level-2)
   (advice-add #'erlang-font-lock-level-3 :around #'erlang-ts--font-lock-level-3)
   (advice-add #'erlang-font-lock-level-4 :around #'erlang-ts--font-lock-level-4)
+
+  (erlang-ts-imenu-setup)
 
   (treesit-major-mode-setup)
   (setq-local syntax-propertize-function #'erlang-ts--syntax-propertize))
