@@ -67,6 +67,26 @@
 (require 'treesit)
 (require 'erlang)
 
+;;; Grammar installation
+
+(defconst erlang-ts-grammar-recipe
+  '(erlang "https://github.com/WhatsApp/tree-sitter-erlang")
+  "Tree-sitter grammar recipe for Erlang.
+A list of (LANGUAGE URL) suitable for use in
+`treesit-language-source-alist'.")
+
+;;;###autoload
+(defun erlang-ts-install-grammar (&optional force)
+  "Install the Erlang tree-sitter grammar if not already available.
+With prefix argument FORCE, reinstall even if already installed.
+This is useful after upgrading to a version that requires a newer
+grammar."
+  (interactive "P")
+  (when (or force (not (treesit-language-available-p 'erlang nil)))
+    (message "Installing Erlang tree-sitter grammar...")
+    (let ((treesit-language-source-alist (list erlang-ts-grammar-recipe)))
+      (treesit-install-language-grammar 'erlang))))
+
 ;; Override erlang font-lock functions
 ;; So the menus (and functions) work as expected
 (defun erlang-ts--font-lock-level-1 (func &rest args)
