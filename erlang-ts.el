@@ -556,6 +556,9 @@ Use (setq lsp-enable-imenu nil) to disable lsp-imenu"
   "Major mode for editing erlang with tree-sitter."
   :syntax-table nil
   (erlang-ts-syntax-table-init)
+  (unless (treesit-language-available-p 'erlang)
+    (when (y-or-n-p "Erlang tree-sitter grammar is not installed.  Install it now?")
+      (erlang-ts-install-grammar)))
   (when (treesit-ready-p 'erlang)
     (treesit-parser-create 'erlang)
     (erlang-ts-setup)))
