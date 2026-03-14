@@ -529,6 +529,28 @@ Use (setq lsp-enable-imenu nil) to disable lsp-imenu"
   (advice-remove #'erlang-font-lock-level-4 #'erlang-ts--font-lock-level-4))
 
 
+;;; Keymap and menu
+
+(defvar erlang-ts-mode-map
+  (let ((map (make-sparse-keymap)))
+    (easy-menu-define erlang-ts-mode-menu map "Erlang-TS Mode Menu"
+      '("Erlang-TS"
+        ("Navigate"
+         ["Beginning of Function" beginning-of-defun]
+         ["End of Function" end-of-defun])
+        "--"
+        ["Mark Function" mark-defun]
+        "--"
+        ("Font-lock level"
+         ["Level 1 (minimal)" erlang-font-lock-level-1]
+         ["Level 2 (keywords)" erlang-font-lock-level-2]
+         ["Level 3 (default)" erlang-font-lock-level-3]
+         ["Level 4 (all)" erlang-font-lock-level-4])
+        "--"
+        ["Install tree-sitter grammar" erlang-ts-install-grammar]))
+    map)
+  "Keymap for `erlang-ts-mode'.")
+
 ;;;###autoload
 (define-derived-mode erlang-ts-mode erlang-mode "erl-ts"
   "Major mode for editing erlang with tree-sitter."
