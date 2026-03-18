@@ -6,9 +6,8 @@
 ;;; Commentary:
 
 ;; Buttercup tests for erlang-ts-mode indentation.
-;; Since erlang-ts-mode derives from erlang-mode, it inherits
-;; erlang-mode's indentation engine.  These tests verify that
-;; indentation works correctly under erlang-ts-mode.
+;; Each test verifies that indentation works correctly with both the
+;; classic erlang-mode engine and the tree-sitter indentation engine.
 
 ;;; Code:
 
@@ -22,25 +21,41 @@
    (split-string code "\n")
    "\n"))
 
+(defun erlang-ts-test--indent-with (code indent-fn region-fn)
+  "Indent CODE using INDENT-FN and REGION-FN, return the result."
+  (with-temp-buffer
+    (insert (erlang-ts-test--strip-indentation code))
+    (erlang-ts-mode)
+    (setq-local indent-line-function indent-fn)
+    (when region-fn
+      (setq-local indent-region-function region-fn))
+    (setq-local indent-tabs-mode nil)
+    (indent-region (point-min) (point-max))
+    (buffer-string)))
+
 (defmacro when-indenting-it (description &rest code-strings)
-  "Create a Buttercup test that asserts each CODE-STRING indents correctly.
+  "Create Buttercup tests asserting CODE-STRINGS indent correctly.
 DESCRIPTION is the test name.  Each element of CODE-STRINGS is a
-properly-indented Erlang code string.  The macro strips indentation,
-re-indents via `erlang-ts-mode', and asserts the result matches the original."
+properly-indented Erlang code string.  Two tests are generated:
+one for erlang-mode indentation, one for tree-sitter indentation."
   (declare (indent 1))
-  `(it ,description
-     ,@(mapcar
-        (lambda (code)
-          `(let ((expected ,code))
-             (expect
-              (with-temp-buffer
-                (insert (erlang-ts-test--strip-indentation expected))
-                (erlang-ts-mode)
-                (setq-local indent-tabs-mode nil)
-                (indent-region (point-min) (point-max))
-                (buffer-string))
-              :to-equal expected)))
-        code-strings)))
+  `(progn
+     (it ,(concat description " (erlang-mode)")
+       ,@(mapcar
+          (lambda (code)
+            `(let ((expected ,code))
+               (expect (erlang-ts-test--indent-with
+                        expected #'erlang-indent-command #'erlang-indent-region)
+                       :to-equal expected)))
+          code-strings))
+     (it ,(concat description " (tree-sitter)")
+       ,@(mapcar
+          (lambda (code)
+            `(let ((expected ,code))
+               (expect (erlang-ts-test--indent-with
+                        expected #'treesit-indent #'treesit-indent-region)
+                       :to-equal expected)))
+          code-strings))))
 
 (describe "erlang-ts indentation"
   (before-all

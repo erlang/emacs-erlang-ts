@@ -31,8 +31,8 @@
 ;;
 ;; Requires emacs-29 compiled with treesitter support.
 ;;
-;; Currently uses treesitter only for syntax-highlighting,
-;; *font-lock-mode*, and uses the "old" erlang-mode for everything else.
+;; Uses tree-sitter for syntax-highlighting and indentation.
+;; Other features are inherited from erlang-mode.
 ;;
 ;; # Install #
 ;;
@@ -57,7 +57,7 @@
 
 ;; Introduction:
 ;; ------------
-;; Currently handles font-locking for erlang-mode
+;; Handles font-locking and indentation for erlang-mode using tree-sitter.
 ;;
 ;; Devs See:
 ;;    M-x treesit-explore-mode
@@ -160,7 +160,8 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
     "when")
   "Erlang reserved keywords.")
 
-(defvar erlang-ts-font-lock-rules
+(defun erlang-ts--build-font-lock-rules ()
+  "Build tree-sitter font-lock rules for Erlang."
   (treesit-font-lock-rules
    :language 'erlang
    :feature 'doc
@@ -317,11 +318,12 @@ FUNC with ARGS will be called if `erlang-ts-mode' is not active."
    '(([ "->" "||" "<-" "<=" "+" "-" "*" "/" "++"
         ">" ">=" "<" "=<" "=" "==" "=:=" "=/="
         "<:-" "<:=" "&&"])
-     @font-lock-operator-face))
+     @font-lock-operator-face)))
 
+(defvar erlang-ts-font-lock-rules nil
   "Tree-sitter font-lock settings for `erlang-ts-mode'.
-Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
- to change settings")
+Computed lazily on first use.  Use `treesit-font-lock-level' or
+`treesit-font-lock-feature-list' to change settings.")
 
 (defun erlang-ts-in-type-context-p (node)
   "Check if NODE is within a type definition context."
@@ -345,14 +347,23 @@ Use `treesit-font-lock-level' or `treesit-font-lock-feature-list'
         t
       nil)))
 
-(defvar erlang-ts--syntax-propertize-query
-  (when (treesit-available-p)
-    (treesit-query-compile
-     'erlang
-     '(((char) @node-char)
-       ((atom) @node-atom)
-       ((string) @node-string-triple-quoted (:match "^\"\"\"" @node-string-triple-quoted))
-       ((string) @node-string)))))
+(defvar erlang-ts--syntax-propertize-query nil
+  "Compiled tree-sitter query for `syntax-propertize'.
+Computed lazily on first use.")
+
+(defun erlang-ts--build-syntax-propertize-query ()
+  "Build and cache the `syntax-propertize' query."
+  (unless erlang-ts--syntax-propertize-query
+    (when (treesit-language-available-p 'erlang)
+      (setq erlang-ts--syntax-propertize-query
+            (treesit-query-compile
+             'erlang
+             '(((char) @node-char)
+               ((atom) @node-atom)
+               ((string) @node-string-triple-quoted
+                         (:match "^\"\"\"" @node-string-triple-quoted))
+               ((string) @node-string))))))
+  erlang-ts--syntax-propertize-query)
 
 (defun erlang-ts--process-node (node)
   "Process a single or double quoted string or atom node.
@@ -404,7 +415,7 @@ NODE is the treesit node to process."
 (defun erlang-ts--syntax-propertize (start end)
   "Apply syntax properties for Erlang specific patterns from START to END."
   (let ((captures
-         (treesit-query-capture 'erlang erlang-ts--syntax-propertize-query start end)))
+         (treesit-query-capture 'erlang (erlang-ts--build-syntax-propertize-query) start end)))
     (pcase-dolist (`(,name . ,node) captures)
       (pcase name
         ('node-char   (erlang-ts--process-node-char node))
@@ -475,6 +486,132 @@ Returns `markdown-inline' when inside a doc attribute string,
         'markdown-inline
       'erlang)))
 
+;;; Indentation
+
+(defcustom erlang-ts-use-treesit-indent t
+  "When non-nil, use tree-sitter based indentation.
+When nil, use the classic erlang-mode indentation engine."
+  :type 'boolean
+  :group 'erlang)
+
+(defun erlang-ts--grand-parent-bol (_node parent _bol &rest _)
+  "Return the first non-whitespace position on PARENT's parent's line."
+  (when-let* ((gp (treesit-node-parent parent)))
+    (save-excursion
+      (goto-char (treesit-node-start gp))
+      (back-to-indentation)
+      (point))))
+
+(defun erlang-ts--anchor-open-brace (_node parent _bol &rest _)
+  "Return position of the opening `{' in PARENT."
+  (save-excursion
+    (goto-char (treesit-node-start parent))
+    (when (search-forward "{" (treesit-node-end parent) t)
+      (1- (point)))))
+
+(defun erlang-ts--anchor-after-open-brace (_node parent _bol &rest _)
+  "Return position right after the opening `{' in PARENT."
+  (save-excursion
+    (goto-char (treesit-node-start parent))
+    (when (search-forward "{" (treesit-node-end parent) t)
+      (point))))
+
+(defun erlang-ts--double-indent-offset (_node _parent _bol &rest _)
+  "Return double `erlang-indent-level'."
+  (* 2 erlang-indent-level))
+
+(defun erlang-ts--match-clause-body-in (grandparent-type)
+  "Return a matcher for clause_body children inside GRANDPARENT-TYPE."
+  (lambda (_node parent _bol &rest _)
+    (and (equal (treesit-node-type parent) "clause_body")
+         (equal (treesit-node-type (treesit-node-parent parent))
+                grandparent-type))))
+
+(defun erlang-ts--indent-rules ()
+  "Return tree-sitter indentation rules for Erlang.
+The return value is suitable for `treesit-simple-indent-rules'."
+  `((erlang
+     ;; Top-level: column 0
+     ((parent-is "source_file") column-0 0)
+
+     ;; `end' aligns with opening construct
+     ((node-is "end") parent-bol 0)
+
+     ;; Keywords that align with their opening construct
+     ((match "^catch$" "try_expr") parent-bol 0)
+
+     ;; receive_after aligns with receive
+     ((node-is "receive_after") parent-bol 0)
+
+     ;; Closing braces in records/maps: align with opening {
+     ((match "^}$" "record_decl") erlang-ts--anchor-open-brace 0)
+     ((match "^}$" "record_expr") erlang-ts--anchor-open-brace 0)
+     ((match "^}$" "map_expr") erlang-ts--anchor-open-brace 0)
+
+     ;; clause_body inside fun_clause/receive_after needs 2x indent
+     ;; because the clause starts on the same line as the keyword
+     (,(erlang-ts--match-clause-body-in "fun_clause")
+      erlang-ts--grand-parent-bol erlang-ts--double-indent-offset)
+     (,(erlang-ts--match-clause-body-in "receive_after")
+      erlang-ts--grand-parent-bol erlang-ts--double-indent-offset)
+
+     ;; Expressions inside clause_body: indent from the clause line
+     ((parent-is "clause_body") parent-bol erlang-indent-level)
+
+     ;; Clauses inside block constructs
+     ((parent-is "case_expr") parent-bol erlang-indent-level)
+     ((parent-is "receive_expr") parent-bol erlang-indent-level)
+     ((parent-is "if_expr") parent-bol erlang-indent-level)
+     ((parent-is "try_expr") parent-bol erlang-indent-level)
+     ((parent-is "catch_clause") parent-bol erlang-indent-level)
+     ((parent-is "receive_after") parent-bol erlang-indent-level)
+     ((parent-is "anonymous_fun") parent-bol erlang-indent-level)
+     ((parent-is "block_expr") parent-bol erlang-indent-level)
+     ((parent-is "maybe_expr") parent-bol erlang-indent-level)
+
+     ;; Record fields: align after {
+     ((node-is "record_field") erlang-ts--anchor-after-open-brace 0)
+     ((parent-is "record_expr") erlang-ts--anchor-after-open-brace 0)
+
+     ;; Map fields: align after {
+     ((parent-is "map_expr") erlang-ts--anchor-after-open-brace 0)
+
+     ;; Function arguments, collections
+     ((parent-is "expr_args") parent-bol erlang-indent-level)
+     ((parent-is "list") parent-bol erlang-indent-level)
+     ((parent-is "tuple") parent-bol erlang-indent-level)
+     ((parent-is "binary") parent-bol erlang-indent-level)
+
+     ;; Comprehensions
+     ((parent-is "list_comprehension") parent-bol erlang-indent-level)
+     ((parent-is "binary_comprehension") parent-bol erlang-indent-level)
+
+     ;; Guard
+     ((parent-is "guard") parent-bol erlang-indent-guard)
+
+     ;; Type specs
+     ((parent-is "spec") parent-bol erlang-indent-level)
+     ((parent-is "type_alias") parent-bol erlang-indent-level)
+     ((parent-is "type_sig") parent-bol erlang-indent-level)
+
+     ;; Error recovery
+     ((parent-is "ERROR") parent-bol erlang-indent-level)
+
+     ;; Catch-all: preserve previous line indentation
+     (no-node prev-line 0))))
+
+(defun erlang-ts-toggle-indent-function ()
+  "Toggle between tree-sitter and erlang-mode indentation."
+  (interactive)
+  (if (eq indent-line-function 'treesit-indent)
+      (progn
+        (setq-local indent-line-function #'erlang-indent-command)
+        (setq-local indent-region-function #'erlang-indent-region)
+        (message "Switched to erlang-mode indentation"))
+    (setq-local indent-line-function #'treesit-indent)
+    (setq-local indent-region-function #'treesit-indent-region)
+    (message "Switched to tree-sitter indentation")))
+
 ;;  imenu support
 
 (defun erlang-ts-imenu-node-func-p (node)
@@ -523,6 +660,11 @@ Use (setq lsp-enable-imenu nil) to disable lsp-imenu"
 
 (defun erlang-ts-setup ()
   "Setup treesit for erlang."
+
+  ;; Compute font-lock rules lazily if not done at load time
+  ;; (e.g. grammar wasn't available during byte-compilation)
+  (unless erlang-ts-font-lock-rules
+    (setq erlang-ts-font-lock-rules (erlang-ts--build-font-lock-rules)))
 
   (let ((use-markdown (and erlang-ts-use-markdown-inline
                            (>= emacs-major-version 30)
@@ -577,7 +719,10 @@ Use (setq lsp-enable-imenu nil) to disable lsp-imenu"
       (face-remap-add-relative 'font-lock-property-name-face
                                :inherit font-lock-constant-face))
 
-  ;; (setq-local treesit-simple-indent-rules erlang-ts-indent-rules)
+  (setq-local treesit-simple-indent-rules (erlang-ts--indent-rules))
+  (when erlang-ts-use-treesit-indent
+    (setq-local indent-line-function #'treesit-indent)
+    (setq-local indent-region-function #'treesit-indent-region))
 
   (if (boundp 'lsp-language-id-configuration)
       (add-to-list 'lsp-language-id-configuration
@@ -631,6 +776,7 @@ Use (setq lsp-enable-imenu nil) to disable lsp-imenu"
          ["Level 3 (default)" erlang-font-lock-level-3]
          ["Level 4 (all)" erlang-font-lock-level-4])
         "--"
+        ["Toggle tree-sitter indentation" erlang-ts-toggle-indent-function]
         ["Install tree-sitter grammar" erlang-ts-install-grammar]
         ["Install markdown grammar" erlang-ts-install-markdown-grammar]))
     map)

@@ -3,10 +3,10 @@
 
 Requires emacs-29 compiled with treesitter support.
 
-Currently uses treesitter only for syntax-highlighting, *font-lock-mode*, and uses the old
-erlang-mode for everything else.
+Uses tree-sitter for syntax highlighting and indentation. Other features
+(compilation, REPL, etc.) are inherited from erlang-mode.
 
-There is a lot of work to do to convert the old erlang mode to use treesitter, but
+There is a lot of work to do to convert the old erlang mode to use tree-sitter, but
 by re-using the old one we can do the conversion little by little.
 
 Help is appreciated.
@@ -34,6 +34,15 @@ Install/compile erlang treesitter support (first time or update treesitter gramm
 
 Customize `treesit-font-lock-level` variable to increase/decrease the coloring,
 or use `M-x erlang-font-lock-level-1-4` to change it.
+
+## Indentation ##
+
+By default, `erlang-ts-mode` uses tree-sitter based indentation. It respects
+the standard `erlang-indent-level` (default 4) and `erlang-indent-guard` (default 2)
+variables.
+
+To switch back to the classic erlang-mode indentation engine, use
+`M-x erlang-ts-toggle-indent-function` or set `erlang-ts-use-treesit-indent` to `nil`.
 
 ## Markdown in doc attributes ##
 
