@@ -67,6 +67,26 @@
 (require 'treesit)
 (require 'erlang)
 
+;;; Grammar installation
+
+(defconst erlang-ts-grammar-recipe
+  '(erlang "https://github.com/WhatsApp/tree-sitter-erlang")
+  "Tree-sitter grammar recipe for Erlang.
+A list of (LANGUAGE URL) suitable for use in
+`treesit-language-source-alist'.")
+
+;;;###autoload
+(defun erlang-ts-install-grammar (&optional force)
+  "Install the Erlang tree-sitter grammar if not already available.
+With prefix argument FORCE, reinstall even if already installed.
+This is useful after upgrading to a version that requires a newer
+grammar."
+  (interactive "P")
+  (when (or force (not (treesit-language-available-p 'erlang nil)))
+    (message "Installing Erlang tree-sitter grammar...")
+    (let ((treesit-language-source-alist (list erlang-ts-grammar-recipe)))
+      (treesit-install-language-grammar 'erlang))))
+
 ;; Override erlang font-lock functions
 ;; So the menus (and functions) work as expected
 (defun erlang-ts--font-lock-level-1 (func &rest args)
@@ -509,11 +529,36 @@ Use (setq lsp-enable-imenu nil) to disable lsp-imenu"
   (advice-remove #'erlang-font-lock-level-4 #'erlang-ts--font-lock-level-4))
 
 
+;;; Keymap and menu
+
+(defvar erlang-ts-mode-map
+  (let ((map (make-sparse-keymap)))
+    (easy-menu-define erlang-ts-mode-menu map "Erlang-TS Mode Menu"
+      '("Erlang-TS"
+        ("Navigate"
+         ["Beginning of Function" beginning-of-defun]
+         ["End of Function" end-of-defun])
+        "--"
+        ["Mark Function" mark-defun]
+        "--"
+        ("Font-lock level"
+         ["Level 1 (minimal)" erlang-font-lock-level-1]
+         ["Level 2 (keywords)" erlang-font-lock-level-2]
+         ["Level 3 (default)" erlang-font-lock-level-3]
+         ["Level 4 (all)" erlang-font-lock-level-4])
+        "--"
+        ["Install tree-sitter grammar" erlang-ts-install-grammar]))
+    map)
+  "Keymap for `erlang-ts-mode'.")
+
 ;;;###autoload
 (define-derived-mode erlang-ts-mode erlang-mode "erl-ts"
   "Major mode for editing erlang with tree-sitter."
   :syntax-table nil
   (erlang-ts-syntax-table-init)
+  (unless (treesit-language-available-p 'erlang)
+    (when (y-or-n-p "Erlang tree-sitter grammar is not installed.  Install it now?")
+      (erlang-ts-install-grammar)))
   (when (treesit-ready-p 'erlang)
     (treesit-parser-create 'erlang)
     (erlang-ts-setup)))
