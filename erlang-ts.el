@@ -69,8 +69,15 @@
 
 ;;; Grammar installation
 
+(defconst erlang-ts-grammar-recipes
+  '((erlang "https://github.com/WhatsApp/tree-sitter-erlang")
+    (markdown-inline "https://github.com/tree-sitter-grammars/tree-sitter-markdown"
+                     nil "tree-sitter-markdown-inline/src"))
+  "Tree-sitter grammar recipes for Erlang and Markdown-Inline.
+Each entry is a list suitable for `treesit-language-source-alist'.")
+
 (defconst erlang-ts-grammar-recipe
-  '(erlang "https://github.com/WhatsApp/tree-sitter-erlang")
+  (car erlang-ts-grammar-recipes)
   "Tree-sitter grammar recipe for Erlang.
 A list of (LANGUAGE URL) suitable for use in
 `treesit-language-source-alist'.")
@@ -86,6 +93,18 @@ grammar."
     (message "Installing Erlang tree-sitter grammar...")
     (let ((treesit-language-source-alist (list erlang-ts-grammar-recipe)))
       (treesit-install-language-grammar 'erlang))))
+
+;;;###autoload
+(defun erlang-ts-install-markdown-grammar (&optional force)
+  "Install the markdown-inline tree-sitter grammar.
+This enables rich markdown highlighting inside -doc and -moduledoc
+attributes.  With prefix argument FORCE, reinstall even if already
+installed."
+  (interactive "P")
+  (when (or force (not (treesit-language-available-p 'markdown-inline nil)))
+    (message "Installing markdown-inline tree-sitter grammar...")
+    (let ((treesit-language-source-alist erlang-ts-grammar-recipes))
+      (treesit-install-language-grammar 'markdown-inline))))
 
 ;; Override erlang font-lock functions
 ;; So the menus (and functions) work as expected
@@ -404,6 +423,58 @@ NODE is the treesit node to process."
       (setq erlang-ts-mode-syntax-table table)))
   (set-syntax-table erlang-ts-mode-syntax-table))
 
+;;; Embedded markdown in doc attributes
+
+(defcustom erlang-ts-use-markdown-inline t
+  "When non-nil, use markdown-inline grammar for doc attribute highlighting.
+This provides rich highlighting of markdown syntax (bold, italic,
+code spans, links, etc.) inside -doc and -moduledoc attributes.
+Requires the markdown-inline tree-sitter grammar to be installed."
+  :type 'boolean
+  :group 'erlang)
+
+(defvar erlang-ts--markdown-font-lock-rules nil
+  "Font-lock rules for markdown-inline in doc attributes.
+Computed lazily on first use.")
+
+(defun erlang-ts--build-markdown-font-lock-rules ()
+  "Build font-lock rules for markdown-inline inside doc attributes."
+  (treesit-font-lock-rules
+   :language 'markdown-inline
+   :feature 'doc
+   :override 'prepend
+   '([(code_span) @font-lock-constant-face]
+     [(emphasis) @italic]
+     [(strong_emphasis) @bold]
+     [(inline_link (link_text) @link)]
+     [(inline_link (link_destination) @font-lock-constant-face)]
+     [(shortcut_link (link_text) @link)]
+     [(image_description) @link])))
+
+(defun erlang-ts--doc-range-rules ()
+  "Return range rules for embedding markdown-inline in doc attributes."
+  (treesit-range-rules
+   :embed 'markdown-inline
+   :host 'erlang
+   :local t
+   '((wild_attribute
+      name: (attr_name name: (atom) @_name
+                       (:equal "doc" @_name))
+      value: (string) @capture)
+     (wild_attribute
+      name: (attr_name name: (atom) @_name
+                       (:equal "moduledoc" @_name))
+      value: (string) @capture))))
+
+(defun erlang-ts--language-at-point (pos)
+  "Return the tree-sitter language at POS.
+Returns `markdown-inline' when inside a doc attribute string,
+`erlang' otherwise."
+  (let ((node (treesit-node-at pos 'markdown-inline)))
+    (if (and node (not (equal (treesit-node-type node) "document")))
+        'markdown-inline
+      'erlang)))
+
 ;;  imenu support
 
 (defun erlang-ts-imenu-node-func-p (node)
@@ -445,17 +516,30 @@ This conflicts with lsp's imenu functionality if lsp is used
 Use (setq lsp-enable-imenu nil) to disable lsp-imenu"
   (setq-local
    treesit-simple-imenu-settings
-   '(
-     ("macros" "\\`pp_define\\'" nil erlang-ts-imenu-pp-name)
+   '(("macros" "\\`pp_define\\'" nil erlang-ts-imenu-pp-name)
      ("records" "\\`record_decl\\'" nil erlang-ts-imenu-record-name)
      ("types" "\\`type_alias\\'" nil erlang-ts-imenu-type-name)
-     ("functions" "\\`fun_decl\\'" erlang-ts-imenu-node-func-p erlang-ts-imenu-func-name)
-     )))
+     ("functions" "\\`fun_decl\\'" erlang-ts-imenu-node-func-p erlang-ts-imenu-func-name))))
 
 (defun erlang-ts-setup ()
   "Setup treesit for erlang."
 
-  (setq-local treesit-font-lock-settings erlang-ts-font-lock-rules)
+  (let ((use-markdown (and erlang-ts-use-markdown-inline
+                           (>= emacs-major-version 30)
+                           (treesit-ready-p 'markdown-inline t))))
+    ;; Embedded markdown in doc attributes
+    (when use-markdown
+      (setq-local treesit-range-settings (erlang-ts--doc-range-rules))
+      (setq-local treesit-language-at-point-function
+                  #'erlang-ts--language-at-point)
+      (unless erlang-ts--markdown-font-lock-rules
+        (setq erlang-ts--markdown-font-lock-rules
+              (erlang-ts--build-markdown-font-lock-rules))))
+
+    (setq-local treesit-font-lock-settings
+                (append erlang-ts-font-lock-rules
+                        (when use-markdown
+                          erlang-ts--markdown-font-lock-rules))))
 
   (setq-local font-lock-defaults nil)
   (setq-local treesit-font-lock-feature-list
@@ -547,7 +631,8 @@ Use (setq lsp-enable-imenu nil) to disable lsp-imenu"
          ["Level 3 (default)" erlang-font-lock-level-3]
          ["Level 4 (all)" erlang-font-lock-level-4])
         "--"
-        ["Install tree-sitter grammar" erlang-ts-install-grammar]))
+        ["Install tree-sitter grammar" erlang-ts-install-grammar]
+        ["Install markdown grammar" erlang-ts-install-markdown-grammar]))
     map)
   "Keymap for `erlang-ts-mode'.")
 

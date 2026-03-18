@@ -35,6 +35,16 @@ Install/compile erlang treesitter support (first time or update treesitter gramm
 Customize `treesit-font-lock-level` variable to increase/decrease the coloring,
 or use `M-x erlang-font-lock-level-1-4` to change it.
 
+## Markdown in doc attributes ##
+
+`erlang-ts-mode` can highlight markdown syntax (bold, italic, code spans, links)
+inside `-doc` and `-moduledoc` attributes using the `markdown-inline` tree-sitter
+grammar. This requires Emacs 30+ and is enabled by default when the grammar is
+available.
+
+Install the grammar with `M-x erlang-ts-install-markdown-grammar`. To disable
+markdown highlighting, set `erlang-ts-use-markdown-inline` to `nil`.
+
 # Hacking #
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, how to run tests,
