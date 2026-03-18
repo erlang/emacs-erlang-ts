@@ -35,6 +35,8 @@ Install/compile erlang treesitter support (first time or update treesitter gramm
 Customize `treesit-font-lock-level` variable to increase/decrease the coloring,
 or use `M-x erlang-font-lock-level-1-4` to change it.
 
+# Hacking #
 
-
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, how to run tests,
+and guidelines for submitting changes.
 

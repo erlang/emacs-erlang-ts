@@ -1,0 +1,34 @@
+; -*- mode: emacs-lisp; lexical-binding: t -*-
+
+(eldev-require-version "1.11")
+
+(eldev-use-package-archive 'gnu-elpa)
+(eldev-use-package-archive 'nongnu-elpa)
+(eldev-use-package-archive 'melpa)
+
+;; Snap-installed Emacs may need these environment variables when
+;; invoked in batch mode (e.g. via Eldev).
+(when (and (file-directory-p "/snap/emacs/current/")
+           (not (getenv "EMACS_SNAP_DIR")))
+  (setenv "EMACS_SNAP_DIR" "/snap/emacs/current/")
+  (setenv "EMACS_SNAP_USER_COMMON"
+          (expand-file-name "snap/emacs/common" "~/")))
+
+(eldev-use-plugin 'autoloads)
+
+(eldev-add-extra-dependencies 'test 'buttercup)
+
+;; Install the Erlang tree-sitter grammar if not already available.
+(require 'treesit)
+(add-to-list 'treesit-language-source-alist
+             '(erlang "https://github.com/WhatsApp/tree-sitter-erlang"))
+(unless (treesit-language-available-p 'erlang)
+  (treesit-install-language-grammar 'erlang))
+
+;; configuration for the default linters
+(setq byte-compile-docstring-max-column 120)
+(setq checkdoc-force-docstrings-flag nil)
+(setq checkdoc-permit-comma-termination-flag t)
+(setq checkdoc--interactive-docstring-flag nil)
+
+(setq eldev-project-main-file "erlang-ts.el")
