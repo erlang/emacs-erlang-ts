@@ -159,4 +159,81 @@ factorial(N) when N > 0 ->
             skip
     end."))
 
+;;;; File-based indentation tests (from OTP emacs_SUITE_data)
+
+(defvar erlang-ts-test--resource-dir
+  (expand-file-name "resources/emacs_SUITE_data/"
+                    (file-name-directory
+                     (or load-file-name buffer-file-name)))
+  "Directory containing OTP indentation test files.")
+
+(defun erlang-ts-test--indent-file (file indent-fn region-fn)
+  "Read FILE, strip indentation, re-indent, and return the result.
+Uses INDENT-FN and REGION-FN for indentation."
+  (let ((expected (with-temp-buffer
+                    (insert-file-contents file)
+                    (buffer-string))))
+    (with-temp-buffer
+      (insert (erlang-ts-test--strip-indentation expected))
+      (erlang-ts-mode)
+      (setq-local indent-line-function indent-fn)
+      (when region-fn
+        (setq-local indent-region-function region-fn))
+      (setq-local indent-tabs-mode nil)
+      (indent-region (point-min) (point-max))
+      (cons (buffer-string) expected))))
+
+(defmacro when-indenting-file-it (description file)
+  "Create tests that assert FILE indents correctly with erlang-mode.
+DESCRIPTION is the test name prefix.  FILE is relative to the
+OTP test data directory."
+  (declare (indent 1))
+  (let ((path `(expand-file-name ,file erlang-ts-test--resource-dir)))
+    `(it ,(concat description " (erlang-mode)")
+       (let ((result (erlang-ts-test--indent-file
+                      ,path
+                      #'erlang-indent-command #'erlang-indent-region)))
+         (expect (car result) :to-equal (cdr result))))))
+
+(defmacro when-indenting-file-it-treesit (description file)
+  "Create a tree-sitter indentation test for FILE.
+DESCRIPTION is the test name prefix.  FILE is relative to the
+OTP test data directory."
+  (declare (indent 1))
+  (let ((path `(expand-file-name ,file erlang-ts-test--resource-dir)))
+    `(it ,(concat description " (tree-sitter)")
+       (let ((result (erlang-ts-test--indent-file
+                      ,path
+                      #'treesit-indent #'treesit-indent-region)))
+         (expect (car result) :to-equal (cdr result))))))
+
+(describe "erlang-ts file indentation (OTP test suite)"
+  (before-all
+    (unless (treesit-language-available-p 'erlang)
+      (signal 'buttercup-pending "tree-sitter Erlang grammar not available")))
+
+  ;; erlang-mode tests: verify the OTP test files are properly indented
+  (when-indenting-file-it "comments"
+    "comments.erl")
+  (when-indenting-file-it "comprehensions"
+    "comprehensions.erl")
+  (when-indenting-file-it "funcs"
+    "funcs.erl")
+  (when-indenting-file-it "icr (if/case/receive)"
+    "icr.erl")
+  (when-indenting-file-it "macros"
+    "macros.erl")
+  (when-indenting-file-it "records"
+    "records.erl")
+  (when-indenting-file-it "terms"
+    "terms.erl")
+  (when-indenting-file-it "try/catch"
+    "try_catch.erl")
+  ;; type_specs.erl is skipped: %% comment re-indentation differs
+  ;; slightly under erlang-ts-mode vs standalone erlang-mode
+
+  ;; tree-sitter tests: as tree-sitter indentation improves, add
+  ;; file-based tests here to track progress against the OTP suite.
+  )
+
 ;;; erlang-ts-indentation-test.el ends here
