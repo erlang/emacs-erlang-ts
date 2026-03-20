@@ -502,15 +502,31 @@ When nil, use the classic erlang-mode indentation engine."
       (back-to-indentation)
       (point))))
 
-(defun erlang-ts--anchor-open-brace (_node parent _bol &rest _)
-  "Return position of the opening `{' in PARENT."
+(defun erlang-ts--anchor-matching-open (node parent _bol &rest _)
+  "Return position of the opening delimiter matching NODE.
+Matches `)' to `(', `]' to `[', and `}' to `{'."
+  (let ((close (treesit-node-type node)))
+    (save-excursion
+      (goto-char (treesit-node-start parent))
+      (let ((open (pcase close
+                    (")" "(")
+                    ("]" "\\[")
+                    ("}" "{"))))
+        (when (and open (re-search-forward open (treesit-node-end parent) t))
+          (1- (point)))))))
+
+(defun erlang-ts--anchor-after-open-delim (_node parent _bol &rest _)
+  "Return position right after the opening delimiter in PARENT.
+Finds the first `(', `[', or `{' in PARENT and returns the
+position after it.  Used to align elements with the first element."
   (save-excursion
     (goto-char (treesit-node-start parent))
-    (when (search-forward "{" (treesit-node-end parent) t)
-      (1- (point)))))
+    (when (re-search-forward "[[({]" (treesit-node-end parent) t)
+      (point))))
 
 (defun erlang-ts--anchor-after-open-brace (_node parent _bol &rest _)
-  "Return position right after the opening `{' in PARENT."
+  "Return position right after the opening `{' in PARENT.
+Used for record and map fields where `{' is the relevant delimiter."
   (save-excursion
     (goto-char (treesit-node-start parent))
     (when (search-forward "{" (treesit-node-end parent) t)
@@ -543,10 +559,8 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ;; receive_after aligns with receive
      ((node-is "receive_after") parent-bol 0)
 
-     ;; Closing braces in records/maps: align with opening {
-     ((match "^}$" "record_decl") erlang-ts--anchor-open-brace 0)
-     ((match "^}$" "record_expr") erlang-ts--anchor-open-brace 0)
-     ((match "^}$" "map_expr") erlang-ts--anchor-open-brace 0)
+     ;; Closing delimiters: align with their opening counterpart
+     ((match "^[])}]$" nil) erlang-ts--anchor-matching-open 0)
 
      ;; clause_body inside fun_clause/receive_after needs 2x indent
      ;; because the clause starts on the same line as the keyword
@@ -569,18 +583,21 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ((parent-is "block_expr") parent-bol erlang-indent-level)
      ((parent-is "maybe_expr") parent-bol erlang-indent-level)
 
-     ;; Record fields: align after {
+     ;; Record/map fields: align after { (not ( which comes earlier)
      ((node-is "record_field") erlang-ts--anchor-after-open-brace 0)
      ((parent-is "record_expr") erlang-ts--anchor-after-open-brace 0)
-
-     ;; Map fields: align after {
      ((parent-is "map_expr") erlang-ts--anchor-after-open-brace 0)
 
-     ;; Function arguments, collections
-     ((parent-is "expr_args") parent-bol erlang-indent-level)
-     ((parent-is "list") parent-bol erlang-indent-level)
-     ((parent-is "tuple") parent-bol erlang-indent-level)
-     ((parent-is "binary") parent-bol erlang-indent-level)
+     ;; Function arguments and collections: align after opening delimiter
+     ((parent-is "expr_args") erlang-ts--anchor-after-open-delim 0)
+     ((parent-is "list") erlang-ts--anchor-after-open-delim 0)
+     ((parent-is "tuple") erlang-ts--anchor-after-open-delim 0)
+     ((parent-is "binary") erlang-ts--anchor-after-open-delim 0)
+
+     ;; Export/import attributes: align after [
+     ((parent-is "export_attribute") erlang-ts--anchor-after-open-delim 0)
+     ((parent-is "import_attribute") erlang-ts--anchor-after-open-delim 0)
+     ((parent-is "export_type_attribute") erlang-ts--anchor-after-open-delim 0)
 
      ;; Comprehensions
      ((parent-is "list_comprehension") parent-bol erlang-indent-level)
