@@ -532,6 +532,14 @@ Used for record and map fields where `{' is the relevant delimiter."
     (when (search-forward "{" (treesit-node-end parent) t)
       (point))))
 
+(defun erlang-ts--anchor-after-open-bracket (_node parent _bol &rest _)
+  "Return position right after the opening `[' in PARENT.
+Used for export/import attributes where `[' is the relevant delimiter."
+  (save-excursion
+    (goto-char (treesit-node-start parent))
+    (when (search-forward "[" (treesit-node-end parent) t)
+      (point))))
+
 (defun erlang-ts--double-indent-offset (_node _parent _bol &rest _)
   "Return double `erlang-indent-level'."
   (* 2 erlang-indent-level))
@@ -595,9 +603,9 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ((parent-is "binary") erlang-ts--anchor-after-open-delim 0)
 
      ;; Export/import attributes: align after [
-     ((parent-is "export_attribute") erlang-ts--anchor-after-open-delim 0)
-     ((parent-is "import_attribute") erlang-ts--anchor-after-open-delim 0)
-     ((parent-is "export_type_attribute") erlang-ts--anchor-after-open-delim 0)
+     ((parent-is "export_attribute") erlang-ts--anchor-after-open-bracket 0)
+     ((parent-is "import_attribute") erlang-ts--anchor-after-open-bracket 0)
+     ((parent-is "export_type_attribute") erlang-ts--anchor-after-open-bracket 0)
 
      ;; Comprehensions
      ((parent-is "list_comprehension") parent-bol erlang-indent-level)
