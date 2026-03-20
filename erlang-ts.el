@@ -609,6 +609,9 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ((parent-is "block_expr") parent-bol erlang-indent-level)
      ((parent-is "maybe_expr") parent-bol erlang-indent-level)
 
+     ;; Macro body: align after opening (
+     ((parent-is "pp_define") erlang-ts--anchor-after-open-delim 0)
+
      ;; Record/map fields: align after { (not ( which comes earlier)
      ((node-is "record_field") erlang-ts--anchor-after-open-brace 0)
      ((parent-is "record_expr") erlang-ts--anchor-after-open-brace 0)
