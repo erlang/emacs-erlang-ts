@@ -551,6 +551,20 @@ Used for export/import attributes where `[' is the relevant delimiter."
          (equal (treesit-node-type (treesit-node-parent parent))
                 grandparent-type))))
 
+(defun erlang-ts--match-inline-clause-body (clause-type block-type)
+  "Return a matcher for clause_body children in inline-style clauses.
+Matches when the parent is a clause_body inside CLAUSE-TYPE, and the
+clause starts on the same line as the enclosing BLOCK-TYPE keyword."
+  (lambda (_node parent _bol &rest _)
+    (and (equal (treesit-node-type parent) "clause_body")
+         (let ((clause (treesit-node-parent parent)))
+           (and (equal (treesit-node-type clause) clause-type)
+                (let ((block (treesit-node-parent clause)))
+                  (and (equal (treesit-node-type block) block-type)
+                       ;; Check if clause starts on same line as block keyword
+                       (= (line-number-at-pos (treesit-node-start block))
+                          (line-number-at-pos (treesit-node-start clause))))))))))
+
 (defun erlang-ts--indent-rules ()
   "Return tree-sitter indentation rules for Erlang.
 The return value is suitable for `treesit-simple-indent-rules'."
@@ -575,6 +589,10 @@ The return value is suitable for `treesit-simple-indent-rules'."
      (,(erlang-ts--match-clause-body-in "fun_clause")
       erlang-ts--grand-parent-bol erlang-ts--double-indent-offset)
      (,(erlang-ts--match-clause-body-in "receive_after")
+      erlang-ts--grand-parent-bol erlang-ts--double-indent-offset)
+     ;; if_clause body needs 2x indent only when the clause is on
+     ;; the same line as the `if' keyword (inline style)
+     (,(erlang-ts--match-inline-clause-body "if_clause" "if_expr")
       erlang-ts--grand-parent-bol erlang-ts--double-indent-offset)
 
      ;; Expressions inside clause_body: indent from the clause line
