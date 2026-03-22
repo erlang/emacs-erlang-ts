@@ -670,9 +670,10 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ;; Guard
      ((parent-is "guard") parent-bol erlang-indent-guard)
 
-     ;; Type specs
+     ;; Type specs: body indented 2x, | alternatives aligned at indent+2
      ((parent-is "spec") parent-bol erlang-indent-level)
-     ((parent-is "type_alias") parent-bol erlang-indent-level)
+     ((parent-is "type_alias") parent-bol erlang-ts--double-indent-offset)
+     ((parent-is "opaque") parent-bol erlang-ts--double-indent-offset)
      ((parent-is "type_sig") parent-bol erlang-indent-level)
 
      ;; Error recovery
