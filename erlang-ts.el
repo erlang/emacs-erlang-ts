@@ -631,6 +631,17 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ;; Comprehensions
      ((parent-is "list_comprehension") parent-bol erlang-indent-level)
      ((parent-is "binary_comprehension") parent-bol erlang-indent-level)
+     ((parent-is "lc_exprs") parent-bol 0)
+     ((parent-is "lc_or_zc_expr") parent-bol 0)
+     ((parent-is "generator") parent-bol erlang-indent-level)
+     ((parent-is "b_generator") parent-bol erlang-indent-level)
+
+     ;; Multi-line expressions
+     ((parent-is "binary_op_expr") parent-bol erlang-indent-level)
+     ((parent-is "match_expr") parent-bol erlang-indent-level)
+     ((parent-is "unary_op_expr") parent-bol erlang-indent-level)
+     ((parent-is "pipe") parent-bol 0)
+     ((parent-is "paren_expr") parent-bol erlang-indent-level)
 
      ;; Guard
      ((parent-is "guard") parent-bol erlang-indent-guard)
