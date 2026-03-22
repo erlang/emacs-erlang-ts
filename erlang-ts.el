@@ -524,6 +524,29 @@ position after it.  Used to align elements with the first element."
     (when (re-search-forward "[[({]" (treesit-node-end parent) t)
       (point))))
 
+(defun erlang-ts--anchor-args (_node parent _bol &rest _)
+  "Return anchor position for function arguments in PARENT.
+When the opening `(' has content on the same line, align after it.
+When `(' is at end of line (Okeefe style), indent from parent start."
+  (save-excursion
+    (goto-char (treesit-node-start parent))
+    (when (re-search-forward "(" (treesit-node-end parent) t)
+      (if (looking-at "[ \t]*$")
+          ;; Paren at end of line: use erlang-argument-indent from parent
+          (let ((target-col (+ (save-excursion
+                                 (goto-char (treesit-node-start
+                                             (treesit-node-parent parent)))
+                                 (current-column))
+                               (if (boundp 'erlang-argument-indent)
+                                   erlang-argument-indent
+                                 erlang-indent-level))))
+            (goto-char (treesit-node-start parent))
+            (beginning-of-line)
+            (move-to-column target-col t)
+            (point))
+        ;; Content follows: align after (
+        (point)))))
+
 (defun erlang-ts--anchor-after-open-brace (_node parent _bol &rest _)
   "Return position right after the opening `{' in PARENT.
 Used for record and map fields where `{' is the relevant delimiter."
@@ -617,8 +640,9 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ((parent-is "record_expr") erlang-ts--anchor-after-open-brace 0)
      ((parent-is "map_expr") erlang-ts--anchor-after-open-brace 0)
 
-     ;; Function arguments and collections: align after opening delimiter
-     ((parent-is "expr_args") erlang-ts--anchor-after-open-delim 0)
+     ;; Function arguments: smart alignment (Okeefe-aware)
+     ((parent-is "expr_args") erlang-ts--anchor-args 0)
+     ;; Collections: align after opening delimiter
      ((parent-is "list") erlang-ts--anchor-after-open-delim 0)
      ((parent-is "tuple") erlang-ts--anchor-after-open-delim 0)
      ((parent-is "binary") erlang-ts--anchor-after-open-delim 0)
