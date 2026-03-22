@@ -503,7 +503,7 @@ When nil, use the classic erlang-mode indentation engine."
       (point))))
 
 (defun erlang-ts--anchor-matching-open (node parent _bol &rest _)
-  "Return position of the opening delimiter matching NODE.
+  "Return position of the opening delimiter matching NODE in PARENT.
 Matches `)' to `(', `]' to `[', and `}' to `{'."
   (let ((close (treesit-node-type node)))
     (save-excursion
@@ -564,13 +564,13 @@ Used for export/import attributes where `[' is the relevant delimiter."
       (point))))
 
 (defun erlang-ts--match-triple-comment (node _parent _bol &rest _)
-  "Match %%% comments (three or more percent signs)."
+  "Match NODE when it is a %%% comment (three or more percent signs)."
   (and node
        (equal (treesit-node-type node) "comment")
        (string-prefix-p "%%%" (treesit-node-text node))))
 
 (defun erlang-ts--match-single-comment (node _parent _bol &rest _)
-  "Match single % comments (not %% or %%%)."
+  "Match NODE when it is a single % comment (not %% or %%%)."
   (and node
        (equal (treesit-node-type node) "comment")
        (let ((text (treesit-node-text node)))
