@@ -44,6 +44,88 @@ variables.
 To switch back to the classic erlang-mode indentation engine, use
 `M-x erlang-ts-toggle-indent-function` or set `erlang-ts-use-treesit-indent` to `nil`.
 
+### Known indentation limitations ###
+
+The tree-sitter indentation handles common Erlang constructs well but has
+some known gaps compared to erlang-mode. Improvements are ongoing and
+contributions are welcome!
+
+#### Continuation lines ####
+
+Multi-line expressions where a line continues an expression from the
+previous line may not align correctly in all cases:
+
+```erlang
+%% Comprehension generators may misalign:
+Var = [X ||
+                  #record{a=X} <- lists:seq(1, 10),  %% expected
+                  true = (X rem 2)]
+
+%% Multi-line call arguments inside try/catch:
+try
+    io:format("~s ~s~n",
+                      [St0#leex.xfile]),  %% expected
+    parse_rules(Xfile, Line2, Macs, St2)
+catch ...
+```
+
+#### Inline if clauses ####
+
+When `if` has clauses on the same line, subsequent clauses use a slightly
+different alignment than erlang-mode:
+
+```erlang
+%% erlang-mode aligns subsequent clauses at column 3 after `if':
+    if Z >= 0 ->
+            ok;
+       Z =< 10 ->     %% column 7
+            err
+    end
+
+%% tree-sitter aligns at erlang-indent-level:
+    if Z >= 0 ->
+            ok;
+        Z =< 10 ->    %% column 8
+            err
+    end
+```
+
+#### Comma-first / pipe-first style ####
+
+Code using comma-first or pipe-first formatting may not indent as expected:
+
+```erlang
+%% erlang-mode:
+[ a
+, b
+, c
+]
+
+%% tree-sitter:
+[ a
+  , b
+  , c
+]
+```
+
+#### Records with `{` on a separate line ####
+
+When the opening brace is on a different line from `-record(name,`:
+
+```erlang
+%% erlang-mode:
+-record(record0,
+        {           %% aligned after (
+         r0a,
+         r0b
+        }).
+
+%% tree-sitter doesn't handle this multi-line pattern yet
+```
+
+If you encounter indentation issues, you can always switch to erlang-mode's
+indentation with `M-x erlang-ts-toggle-indent-function`.
+
 ## Markdown in doc attributes ##
 
 `erlang-ts-mode` can highlight markdown syntax (bold, italic, code spans, links)
