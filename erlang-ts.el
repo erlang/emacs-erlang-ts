@@ -563,6 +563,24 @@ Used for export/import attributes where `[' is the relevant delimiter."
     (when (search-forward "[" (treesit-node-end parent) t)
       (point))))
 
+(defun erlang-ts--match-triple-comment (node _parent _bol &rest _)
+  "Match %%% comments (three or more percent signs)."
+  (and node
+       (equal (treesit-node-type node) "comment")
+       (string-prefix-p "%%%" (treesit-node-text node))))
+
+(defun erlang-ts--match-single-comment (node _parent _bol &rest _)
+  "Match single % comments (not %% or %%%)."
+  (and node
+       (equal (treesit-node-type node) "comment")
+       (let ((text (treesit-node-text node)))
+         (and (string-prefix-p "%" text)
+              (not (string-prefix-p "%%" text))))))
+
+(defun erlang-ts--offset-comment-column (_node _parent _bol &rest _)
+  "Return `comment-column' as an absolute offset for single-% comments."
+  (or comment-column 48))
+
 (defun erlang-ts--double-indent-offset (_node _parent _bol &rest _)
   "Return double `erlang-indent-level'."
   (* 2 erlang-indent-level))
@@ -592,6 +610,13 @@ clause starts on the same line as the enclosing BLOCK-TYPE keyword."
   "Return tree-sitter indentation rules for Erlang.
 The return value is suitable for `treesit-simple-indent-rules'."
   `((erlang
+     ;; Erlang comment conventions:
+     ;; %%% always at column 0
+     ;; %% context-dependent (follows code indentation)
+     ;; % right-aligned to comment-column
+     (erlang-ts--match-triple-comment column-0 0)
+     (erlang-ts--match-single-comment column-0 erlang-ts--offset-comment-column)
+
      ;; Top-level: column 0
      ((parent-is "source_file") column-0 0)
 
