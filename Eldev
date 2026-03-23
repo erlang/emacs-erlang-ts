@@ -18,12 +18,15 @@
 
 (eldev-add-extra-dependencies 'test 'buttercup)
 
-;; Install the Erlang tree-sitter grammar if not already available.
+;; Install tree-sitter grammars if not already available.
 (require 'treesit)
-(add-to-list 'treesit-language-source-alist
-             '(erlang "https://github.com/WhatsApp/tree-sitter-erlang"))
-(unless (treesit-language-available-p 'erlang)
-  (treesit-install-language-grammar 'erlang))
+(dolist (recipe '((erlang "https://github.com/WhatsApp/tree-sitter-erlang")
+                  (markdown-inline
+                   "https://github.com/tree-sitter-grammars/tree-sitter-markdown"
+                   nil "tree-sitter-markdown-inline/src")))
+  (add-to-list 'treesit-language-source-alist recipe)
+  (unless (treesit-language-available-p (car recipe))
+    (treesit-install-language-grammar (car recipe))))
 
 ;; configuration for the default linters
 (setq byte-compile-docstring-max-column 120)

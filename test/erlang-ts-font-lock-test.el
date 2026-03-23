@@ -14,6 +14,17 @@
 (require 'buttercup)
 (require 'erlang-ts)
 
+;;;; Buttercup matchers
+
+(buttercup-define-matcher :to-include-face (face expected)
+  "Check that FACE (a symbol or list) includes EXPECTED."
+  (let* ((f (funcall face))
+         (e (funcall expected))
+         (faces (if (listp f) f (list f))))
+    (if (memq e faces)
+        t
+      `(nil . ,(format "Expected face %S to include %S" f e)))))
+
 ;;;; Test helpers
 
 (defmacro with-fontified-erlang-ts-buffer (content &rest body)
@@ -150,7 +161,31 @@ triple asserts that positions START through END have FACE."
       ;; -doc "A doc string".
       ;; 12345678901234567890
       ("-doc \"A doc string\"."
-       (6 19 font-lock-doc-face))))
+       (6 19 font-lock-doc-face)))
+
+    (describe "embedded markdown"
+      (it "fontifies bold in -doc"
+        (assume (and (>= emacs-major-version 30)
+                     (treesit-language-available-p 'markdown-inline)))
+        (with-fontified-erlang-ts-buffer "-doc \"This **bold** text\"."
+          (expect (get-text-property 14 'face) :to-include-face 'bold)))
+
+      (it "fontifies code spans in -doc"
+        (assume (and (>= emacs-major-version 30)
+                     (treesit-language-available-p 'markdown-inline)))
+        (with-fontified-erlang-ts-buffer "-doc \"Use `code` here\"."
+          (expect (get-text-property 12 'face)
+                  :to-include-face 'font-lock-constant-face)))
+
+      (it "fontifies bold in -moduledoc"
+        (assume (and (>= emacs-major-version 30)
+                     (treesit-language-available-p 'markdown-inline)))
+        (with-fontified-erlang-ts-buffer "-moduledoc \"This **bold** text\"."
+          (expect (get-text-property 20 'face) :to-include-face 'bold)))
+
+      (it "preserves doc face on plain text"
+        (with-fontified-erlang-ts-buffer "-doc \"plain text\"."
+          (expect (get-text-property 7 'face) :to-equal 'font-lock-doc-face)))))
 
   ;; ---- Level 2 features ------------------------------------------------
 

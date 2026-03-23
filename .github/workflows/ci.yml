@@ -10,6 +10,7 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         emacs-version:
           - 29.4
@@ -34,7 +35,12 @@ jobs:
             (treesit-install-language-grammar 'erlang))"
 
       - run: eldev byte-compile --warnings-as-errors
+        # Byte-compilation fails on Emacs 31 snapshot due to
+        # incompatibility between the erlang package and Emacs 31.
+        continue-on-error: ${{ matrix.emacs-version == 'snapshot' }}
 
       - run: eldev test
+        continue-on-error: ${{ matrix.emacs-version == 'snapshot' }}
 
       - run: eldev lint
+        continue-on-error: ${{ matrix.emacs-version == 'snapshot' }}
