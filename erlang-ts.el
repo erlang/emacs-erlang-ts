@@ -619,6 +619,10 @@ The return value is suitable for `treesit-simple-indent-rules'."
      (erlang-ts--match-triple-comment column-0 0)
      (erlang-ts--match-single-comment column-0 erlang-ts--offset-comment-column)
 
+     ;; Strings: never re-indent content inside strings
+     ;; (changing indentation would change the string value)
+     ((parent-is "^string$") no-indent 0)
+
      ;; Top-level: column 0
      ((parent-is "source_file") column-0 0)
 

@@ -162,7 +162,33 @@ factorial(N) when N > 0 ->
             end;
         _ ->
             skip
-    end."))
+    end.")
+
+  (it "does not re-indent content inside strings (tree-sitter)"
+    (let ((code "foo() ->\n    \"\nsome text\n  inside string\n\"."))
+      (expect
+       (with-temp-buffer
+         (insert code)
+         (erlang-ts-mode)
+         (setq-local indent-line-function #'treesit-indent)
+         (setq-local indent-region-function #'treesit-indent-region)
+         (setq-local indent-tabs-mode nil)
+         (indent-region (point-min) (point-max))
+         (buffer-string))
+       :to-equal code)))
+
+  (it "does not re-indent content inside doc strings (tree-sitter)"
+    (let ((code "-doc \"\"\"\n```erlang\nbar() ->\n    ok\n```\n\"\"\"."))
+      (expect
+       (with-temp-buffer
+         (insert code)
+         (erlang-ts-mode)
+         (setq-local indent-line-function #'treesit-indent)
+         (setq-local indent-region-function #'treesit-indent-region)
+         (setq-local indent-tabs-mode nil)
+         (indent-region (point-min) (point-max))
+         (buffer-string))
+       :to-equal code))))
 
 ;;;; File-based indentation tests (from OTP emacs_SUITE_data)
 
