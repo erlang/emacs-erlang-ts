@@ -670,9 +670,9 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ;; Function arguments: smart alignment (Okeefe-aware)
      ((parent-is "expr_args") erlang-ts--anchor-args 0)
      ;; Collections: align after opening delimiter
-     ((parent-is "list") erlang-ts--anchor-after-open-delim 0)
-     ((parent-is "tuple") erlang-ts--anchor-after-open-delim 0)
-     ((parent-is "binary") erlang-ts--anchor-after-open-delim 0)
+     ((parent-is "^list$") erlang-ts--anchor-after-open-delim 0)
+     ((parent-is "^tuple$") erlang-ts--anchor-after-open-delim 0)
+     ((parent-is "^binary$") erlang-ts--anchor-after-open-delim 0)
 
      ;; Export/import attributes: align after [
      ((parent-is "export_attribute") erlang-ts--anchor-after-open-bracket 0)

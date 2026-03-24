@@ -129,6 +129,11 @@ factorial(N) when N > 0 ->
     "doubles(Xs) ->
     [X * 2 || X <- Xs].")
 
+  (when-indenting-it "indents a multi-line binary operation"
+    "add(X, Y) ->
+    X +
+        Y.")
+
   (when-indenting-it "indents a record definition"
     "-record(person, {
                  name :: string(),
