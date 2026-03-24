@@ -481,10 +481,12 @@ Computed lazily on first use.")
   "Return the tree-sitter language at POS.
 Returns `markdown-inline' when inside a doc attribute string,
 `erlang' otherwise."
-  (let ((node (treesit-node-at pos 'markdown-inline)))
-    (if (and node (not (equal (treesit-node-type node) "document")))
-        'markdown-inline
-      'erlang)))
+  (if (and (seq-some (lambda (p) (eq (treesit-parser-language p) 'markdown-inline))
+                     (treesit-parser-list))
+           (let ((node (treesit-node-at pos 'markdown-inline)))
+             (and node (not (equal (treesit-node-type node) "document")))))
+      'markdown-inline
+    'erlang))
 
 ;;; Indentation
 
