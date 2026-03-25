@@ -37,12 +37,13 @@ or use `M-x erlang-font-lock-level-1-4` to change it.
 
 ## Indentation ##
 
-By default, `erlang-ts-mode` uses tree-sitter based indentation. It respects
-the standard `erlang-indent-level` (default 4) and `erlang-indent-guard` (default 2)
-variables.
+By default, `erlang-ts-mode` uses erlang-mode's classic indentation engine.
+An experimental tree-sitter based indentation engine is also available.
+Both respect the standard `erlang-indent-level` (default 4) and
+`erlang-indent-guard` (default 2) variables.
 
-To switch back to the classic erlang-mode indentation engine, use
-`M-x erlang-ts-toggle-indent-function` or set `erlang-ts-use-treesit-indent` to `nil`.
+To try the tree-sitter indentation, use `M-x erlang-ts-toggle-indent-function`
+or set `erlang-ts-use-treesit-indent` to `t`.
 
 ### Known indentation limitations ###
 

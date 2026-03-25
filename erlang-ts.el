@@ -490,9 +490,11 @@ Returns `markdown-inline' when inside a doc attribute string,
 
 ;;; Indentation
 
-(defcustom erlang-ts-use-treesit-indent t
+(defcustom erlang-ts-use-treesit-indent nil
   "When non-nil, use tree-sitter based indentation.
-When nil, use the classic erlang-mode indentation engine."
+When nil, use the classic erlang-mode indentation engine.
+The tree-sitter indentation is experimental and may not handle
+all cases correctly, especially incomplete code during editing."
   :type 'boolean
   :group 'erlang)
 
