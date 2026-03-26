@@ -218,6 +218,17 @@ factorial(N) when N > 0 ->
         case T of
             parse -> ok
         end.")
+  
+  (when-indenting-it "indents when constructs"
+   "function(X, Y)
+  when X >= Y ->
+    F = fun (A)
+              when A > X ->
+                X;
+            (A) ->
+                A
+        end.")
+
 
   (it "does not re-indent content inside strings (tree-sitter)"
     (let ((code "foo() ->\n    \"\nsome text\n  inside string\n\"."))

@@ -593,7 +593,7 @@ Used for export/import attributes where `[' is the relevant delimiter."
 
 (defun erlang-ts--double-indent-offset (_node _parent _bol &rest _)
   "Return double `erlang-indent-level'."
-  (* 2 erlang-indent-level))
+  (* erlang-indent-level 2))
 
 (defun erlang-ts--match-clause-body-in (grandparent-type)
   "Return a matcher for clause_body children inside GRANDPARENT-TYPE."
@@ -654,8 +654,11 @@ The return value is suitable for `treesit-simple-indent-rules'."
      (,(erlang-ts--match-inline-clause-body "if_clause" "if_expr")
       erlang-ts--grand-parent erlang-ts--double-indent-offset)
 
+     ;; guard/when handling
+     ((node-is "when") parent erlang-indent-guard)
+
      ;; Expressions inside clause_body: indent from the clause line
-     ((parent-is "clause_body") parent-bol erlang-indent-level)
+     ((parent-is "clause_body") erlang-ts--grand-parent erlang-indent-level)
 
      ;; Clauses inside block constructs
      ((parent-is "case_expr") parent erlang-indent-level)
