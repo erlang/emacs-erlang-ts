@@ -97,6 +97,8 @@ factorial(N) when N > 0 ->
         F()
     catch
         error:Reason ->
+            {error, Reason};
+        exit:Reason ->
             {error, Reason}
     end.")
 
@@ -163,6 +165,59 @@ factorial(N) when N > 0 ->
         _ ->
             skip
     end.")
+
+  ;; Assignment indentation: block constructs on the RHS of = should
+  ;; indent relative to where the construct starts, not the line start.
+
+  (when-indenting-it "indents case in assignment"
+    "f(T) ->
+    Var = case T of
+              parse -> ok;
+              validate -> error
+          end.")
+
+  (when-indenting-it "indents if in assignment"
+    "f() ->
+    Var = if
+              true -> ok;
+              false -> err
+          end.")
+
+  (when-indenting-it "indents try/catch in assignment"
+    "f() ->
+    Var = try
+              ok
+          catch
+              _:_ -> err
+          end.")
+
+  (when-indenting-it "indents receive in assignment"
+    "f() ->
+    Var = receive
+              Msg -> Msg
+          after 5000 ->
+                  timeout
+          end.")
+
+  (when-indenting-it "indents begin/end in assignment"
+    "f() ->
+    Var = begin
+              step1(),
+              step2()
+          end.")
+
+  (when-indenting-it "indents fun in assignment"
+    "f(N) ->
+    F = fun(X) ->
+                N + X
+        end.")
+
+  (when-indenting-it "indents block construct on next line after ="
+    "f(T) ->
+    Var =
+        case T of
+            parse -> ok
+        end.")
 
   (it "does not re-indent content inside strings (tree-sitter)"
     (let ((code "foo() ->\n    \"\nsome text\n  inside string\n\"."))
