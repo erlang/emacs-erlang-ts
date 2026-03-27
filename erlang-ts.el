@@ -534,6 +534,19 @@ position after it.  Used to align elements with the first element."
     (when (re-search-forward "[[({]" (treesit-node-end parent) t)
       (point))))
 
+(defun erlang-ts--anchor-first-child (node parent _bol &rest _)
+  "Return position aligned with first child.
+Finds the first child of parent and returns position or if no
+(other) children finds the first `(', `[', or `{' in PARENT and returns the
+position after it.  Used to align elements with the first element."
+  (save-excursion
+    (let ((child (treesit-node-child parent 1)))
+      (if (and child (not (equal child node)))
+          (goto-char (treesit-node-start child))
+        (goto-char (treesit-node-start parent))
+        (when (re-search-forward "[[({]" (treesit-node-end parent) t)
+          (point))))))
+
 (defun erlang-ts--anchor-args (_node parent _bol &rest _)
   "Return anchor position for function arguments in PARENT.
 When the opening `(' has content on the same line, align after it.
@@ -682,8 +695,9 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ;; Function arguments: smart alignment (Okeefe-aware)
      ((parent-is "expr_args") erlang-ts--anchor-args 0)
      ;; Collections: align after opening delimiter
-     ((parent-is "^list$") erlang-ts--anchor-after-open-delim 0)
-     ((parent-is "^tuple$") erlang-ts--anchor-after-open-delim 0)
+     ((parent-is "pipe") erlang-ts--grand-parent 0)
+     ((parent-is "^list$") erlang-ts--anchor-first-child 0)
+     ((parent-is "^tuple$") erlang-ts--anchor-first-child 0)
      ((parent-is "^binary$") erlang-ts--anchor-after-open-delim 0)
 
      ;; Export/import attributes: align after [
@@ -703,7 +717,6 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ((parent-is "binary_op_expr") parent-bol erlang-indent-level)
      ((parent-is "match_expr") parent-bol erlang-indent-level)
      ((parent-is "unary_op_expr") parent-bol erlang-indent-level)
-     ((parent-is "pipe") parent-bol 0)
      ((parent-is "paren_expr") parent-bol erlang-indent-level)
 
      ;; Guard

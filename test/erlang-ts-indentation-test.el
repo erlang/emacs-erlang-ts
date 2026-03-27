@@ -143,6 +143,24 @@ factorial(N) when N > 0 ->
             N + X
     end.")
 
+  (when-indenting-it "indents a list"
+    "make_list() ->
+    A = [ foo,
+          bar
+        ],
+    [
+     a,b,c,d,
+     e,f
+    | A].")
+
+ (when-indenting-it "indents a tuple"
+   "make_tuple() ->
+    A = { foo,
+          bar
+        },
+    {a,b,c,d,
+     e,f,A}.")
+
   (when-indenting-it "indents a list comprehension"
     "doubles(Xs) ->
     [X * 2 || X <- Xs].")
