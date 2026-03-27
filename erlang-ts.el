@@ -506,6 +506,16 @@ all cases correctly, especially incomplete code during editing."
       (back-to-indentation)
       (point))))
 
+(defun erlang-ts--grand-parent (_node parent _bol &rest _)
+  "Return the start position of PARENT's parent."
+  (when-let* ((gp (treesit-node-parent parent)))
+    (treesit-node-start gp)))
+
+(defun erlang-ts--great-grand-parent (_node parent _bol &rest _)
+  "Return the start position of PARENT's grandparent."
+  (when-let* ((ggp (treesit-node-parent (treesit-node-parent parent))))
+    (treesit-node-start ggp)))
+
 (defun erlang-ts--anchor-matching-open (node parent _bol &rest _)
   "Return position of the opening delimiter matching NODE in PARENT.
 Matches `)' to `(', `]' to `[', and `}' to `{'."
@@ -629,41 +639,41 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ((parent-is "source_file") column-0 0)
 
      ;; `end' aligns with opening construct
-     ((node-is "end") parent-bol 0)
+     ((node-is "end") parent 0)
 
      ;; Keywords that align with their opening construct
-     ((match "^catch$" "try_expr") parent-bol 0)
+     ((match "^catch$" "try_expr") parent 0)
 
      ;; receive_after aligns with receive
-     ((node-is "receive_after") parent-bol 0)
+     ((node-is "receive_after") parent 0)
 
      ;; Closing delimiters: align with their opening counterpart
      ((match "^[])}]$" nil) erlang-ts--anchor-matching-open 0)
 
-     ;; clause_body inside fun_clause/receive_after needs 2x indent
-     ;; because the clause starts on the same line as the keyword
+     ;; clause_body inside fun_clause needs 2x indent from the
+     ;; anonymous_fun node (great-grandparent: content → clause_body → fun_clause → anonymous_fun)
      (,(erlang-ts--match-clause-body-in "fun_clause")
-      erlang-ts--grand-parent-bol erlang-ts--double-indent-offset)
+      erlang-ts--great-grand-parent erlang-ts--double-indent-offset)
      (,(erlang-ts--match-clause-body-in "receive_after")
-      erlang-ts--grand-parent-bol erlang-ts--double-indent-offset)
+      erlang-ts--grand-parent erlang-ts--double-indent-offset)
      ;; if_clause body needs 2x indent only when the clause is on
      ;; the same line as the `if' keyword (inline style)
      (,(erlang-ts--match-inline-clause-body "if_clause" "if_expr")
-      erlang-ts--grand-parent-bol erlang-ts--double-indent-offset)
+      erlang-ts--grand-parent erlang-ts--double-indent-offset)
 
-     ;; Expressions inside clause_body: indent from the clause line
-     ((parent-is "clause_body") parent-bol erlang-indent-level)
+     ;; Expressions inside clause_body: indent from the clause
+     ((parent-is "clause_body") erlang-ts--grand-parent erlang-indent-level)
 
      ;; Clauses inside block constructs
-     ((parent-is "case_expr") parent-bol erlang-indent-level)
-     ((parent-is "receive_expr") parent-bol erlang-indent-level)
-     ((parent-is "if_expr") parent-bol erlang-indent-level)
-     ((parent-is "try_expr") parent-bol erlang-indent-level)
-     ((parent-is "catch_clause") parent-bol erlang-indent-level)
-     ((parent-is "receive_after") parent-bol erlang-indent-level)
-     ((parent-is "anonymous_fun") parent-bol erlang-indent-level)
-     ((parent-is "block_expr") parent-bol erlang-indent-level)
-     ((parent-is "maybe_expr") parent-bol erlang-indent-level)
+     ((parent-is "case_expr") parent erlang-indent-level)
+     ((parent-is "receive_expr") parent erlang-indent-level)
+     ((parent-is "if_expr") parent erlang-indent-level)
+     ((parent-is "try_expr") parent erlang-indent-level)
+     ((parent-is "catch_clause") parent erlang-indent-level)
+     ((parent-is "receive_after") parent erlang-indent-level)
+     ((parent-is "anonymous_fun") parent erlang-indent-level)
+     ((parent-is "block_expr") parent erlang-indent-level)
+     ((parent-is "maybe_expr") parent erlang-indent-level)
 
      ;; Macro body: align after opening (
      ((parent-is "pp_define") erlang-ts--anchor-after-open-delim 0)
