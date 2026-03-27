@@ -99,6 +99,22 @@ factorial(N) when N > 0 ->
         error:Reason ->
             {error, Reason};
         exit:Reason ->
+            {error, Reason};
+        Throw ->
+            {throw, Throw}
+    end.")
+
+  (when-indenting-it "indents try-of/catch"
+    "safe_call(F) ->
+    try F() of
+        ok ->
+            ok;
+        Error ->
+            {error, Reason}
+    catch
+        error:Reason ->
+            {error, Reason};
+        exit:Reason ->
             {error, Reason}
     end.")
 
@@ -218,7 +234,7 @@ factorial(N) when N > 0 ->
         case T of
             parse -> ok
         end.")
-  
+
   (when-indenting-it "indents when constructs"
    "function(X, Y)
   when X >= Y ->
