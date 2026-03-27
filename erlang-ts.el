@@ -547,6 +547,20 @@ position after it.  Used to align elements with the first element."
         (when (re-search-forward "[[({]" (treesit-node-end parent) t)
           (point))))))
 
+(defun erlang-ts--anchor-second-child (node parent _bol &rest _)
+  "Return position aligned with first element.
+Finds the first non syntax item of the parent and returns position or if no
+(other) children finds the first `(', `[', or `{' in PARENT and returns the
+position after it. Used to align elements with the first element,
+for example in maps."
+  (save-excursion
+    (let ((child (treesit-node-child parent 2)))
+      (if (and child (not (equal child node)))
+          (goto-char (treesit-node-start child))
+        (goto-char (treesit-node-start parent))
+        (when (re-search-forward "[[({]" (treesit-node-end parent) t)
+          (point))))))
+
 (defun erlang-ts--anchor-args (_node parent _bol &rest _)
   "Return anchor position for function arguments in PARENT.
 When the opening `(' has content on the same line, align after it.
@@ -690,7 +704,8 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ;; Record/map fields: align after { (not ( which comes earlier)
      ((node-is "record_field") erlang-ts--anchor-after-open-brace 0)
      ((parent-is "record_expr") erlang-ts--anchor-after-open-brace 0)
-     ((parent-is "map_expr") erlang-ts--anchor-after-open-brace 0)
+     ((parent-is "map_expr") erlang-ts--anchor-second-child 0)
+     ((parent-is "map_field") parent erlang-indent-level)
 
      ;; Function arguments: smart alignment (Okeefe-aware)
      ((parent-is "expr_args") erlang-ts--anchor-args 0)
@@ -727,7 +742,6 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ((parent-is "type_alias") parent-bol erlang-ts--double-indent-offset)
      ((parent-is "opaque") parent-bol erlang-ts--double-indent-offset)
      ((parent-is "type_sig") parent-bol erlang-indent-level)
-
 
      ;; Top-level: column 0
      ((parent-is "source_file") column-0 0)
