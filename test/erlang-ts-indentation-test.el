@@ -190,6 +190,15 @@ factorial(N) when N > 0 ->
                  age :: non_neg_integer()
                 }).")
 
+  (when-indenting-it "indents record constructs"
+    "make_record(A,B,C) ->
+    R1 = #record1{
+            field_1 =
+                A,
+            field_2 = B},
+    #record2{f1 = data,
+             f2 = R1}.")
+
   (when-indenting-it "indents a type definition"
     "-type color() :: red | green | blue.")
 

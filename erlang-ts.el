@@ -536,8 +536,8 @@ position after it.  Used to align elements with the first element."
 
 (defun erlang-ts--anchor-first-child (node parent _bol &rest _)
   "Return position aligned with first child.
-Finds the first child of parent and returns position or if no
-(other) children finds the first `(', `[', or `{' in PARENT and returns the
+Finds the first child of parent and returns position or if NODE is
+the first child finds the first `(', `[', or `{' in PARENT and returns the
 position after it.  Used to align elements with the first element."
   (save-excursion
     (let ((child (treesit-node-child parent 1)))
@@ -549,9 +549,9 @@ position after it.  Used to align elements with the first element."
 
 (defun erlang-ts--anchor-second-child (node parent _bol &rest _)
   "Return position aligned with first element.
-Finds the first non syntax item of the parent and returns position or if no
-(other) children finds the first `(', `[', or `{' in PARENT and returns the
-position after it. Used to align elements with the first element,
+Finds the first non syntax item of the parent and returns position or if NODE
+is the first child finds the first `(', `[', or `{' in PARENT and returns the
+position after it.  Used to align elements with the first element,
 for example in maps."
   (save-excursion
     (let ((child (treesit-node-child parent 2)))
@@ -560,6 +560,19 @@ for example in maps."
         (goto-char (treesit-node-start parent))
         (when (re-search-forward "[[({]" (treesit-node-end parent) t)
           (point))))))
+
+(defun erlang-ts--anchor-record (node parent _bol &rest _)
+  "Return record position aligned with first element.
+Finds the first element of record and returns the position, or
+if NODE is the first element, returns the position `erlang-indent-guard'
+after PARENT."
+  (save-excursion
+    (let ((child (treesit-node-child parent 2)))
+      (if (and child (not (equal child node)))
+          (goto-char (treesit-node-start child))
+        (goto-char (treesit-node-start parent))
+        (when (re-search-forward "[#]" (treesit-node-end parent) t)
+          (+ (point) erlang-indent-guard))))))
 
 (defun erlang-ts--anchor-args (_node parent _bol &rest _)
   "Return anchor position for function arguments in PARENT.
@@ -701,9 +714,10 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ;; Macro body: align after opening (
      ((parent-is "pp_define") erlang-ts--anchor-after-open-delim 0)
 
-     ;; Record/map fields: align after { (not ( which comes earlier)
-     ((node-is "record_field") erlang-ts--anchor-after-open-brace 0)
-     ((parent-is "record_expr") erlang-ts--anchor-after-open-brace 0)
+     ;; Record/map fields:
+     ((parent-is "record_decl") erlang-ts--anchor-after-open-brace 0)
+     ((node-is "record_field") erlang-ts--anchor-record 0)
+     ((parent-is "field_expr") erlang-ts--grand-parent erlang-indent-level)
      ((parent-is "map_expr") erlang-ts--anchor-second-child 0)
      ((parent-is "map_field") parent erlang-indent-level)
 
