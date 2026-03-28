@@ -671,8 +671,10 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ;; (changing indentation would change the string value)
      ((parent-is "^string$") no-indent 0)
 
-     ;; `end' aligns with opening construct
+     ;; 'of', `end' and 'else' aligns with opening construct
      ((node-is "end") parent 0)
+     ((node-is "else") parent 0)
+     ((node-is "of") parent 0)
 
      ;; Keywords that align with their opening construct
      ((match "^catch$" "try_expr") parent 0)

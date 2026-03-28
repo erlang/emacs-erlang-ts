@@ -106,7 +106,8 @@ factorial(N) when N > 0 ->
 
   (when-indenting-it "indents try-of/catch"
     "safe_call(F) ->
-    try F() of
+    try F()
+    of
         ok ->
             ok;
         Error ->
@@ -209,11 +210,22 @@ factorial(N) when N > 0 ->
         step2()
     end.")
 
+  (when-indenting-it "indents maybe"
+    "run() ->
+    maybe
+        foo ?= step1(),
+        bar ?= step2()
+    else
+        Err ->
+            {error, Err}
+    end.")
+
   (when-indenting-it "indents nested case expressions"
     "nested(X, Y) ->
     case X of
         a ->
-            case Y of
+            case Y
+            of
                 b ->
                     ok;
                 _ ->
