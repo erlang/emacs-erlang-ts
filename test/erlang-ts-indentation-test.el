@@ -298,6 +298,43 @@ factorial(N) when N > 0 ->
                 A
         end.")
 
+  (when-indenting-it "list comprehension 1"
+   "function(X) ->
+    L1 = [A ||
+             A <- X,
+             test_next_level(A)].")
+
+  (when-indenting-it "list comprehension 2"
+   "function(X) ->
+    [ A || {ok, A} <-
+               L1,
+           test_next_level(A)].")
+
+  (when-indenting-it "list comprehension 3"
+   "function(X) ->
+    [ very_long_function_name(A)
+      ||
+        A <- L2,
+        test_next_level(A)].")
+
+  (when-indenting-it "binary comprehension 1"
+   "function(X) ->
+    B1 = << << B:32,
+               A:32>> ||
+             <<A:32, B:32>> <-
+                 X>>")
+
+  (when-indenting-it "binary comprehension 2"
+   "function(X) ->
+    << <<B/binary>> || B <- Binary,
+                       byte_size(B) < 128 >>.")
+
+  (when-indenting-it "binary comprehension 3"
+   "function(X) ->
+    << <<B/binary>>
+       ||
+        <<B:32>> <- X,
+        test_next_level(B)>>.")
 
   (it "does not re-indent content inside strings (tree-sitter)"
     (let ((code "foo() ->\n    \"\nsome text\n  inside string\n\"."))

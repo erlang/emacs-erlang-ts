@@ -564,15 +564,24 @@ for example in maps."
 (defun erlang-ts--anchor-record (node parent _bol &rest _)
   "Return record position aligned with first element.
 Finds the first element of record and returns the position, or
-if NODE is the first element, returns the position `erlang-indent-guard'
-after PARENT."
-  (save-excursion
-    (let ((child (treesit-node-child parent 2)))
-      (if (and child (not (equal child node)))
-          (goto-char (treesit-node-start child))
-        (goto-char (treesit-node-start parent))
-        (when (re-search-forward "[#]" (treesit-node-end parent) t)
-          (+ (point) erlang-indent-guard))))))
+if NODE is the first element, returns the position of the record name
+in PARENT + `erlang-indent-guard'."
+  (let ((child (treesit-node-child parent 2)))
+    (if (and child (not (equal child node)))
+        (treesit-node-start child)
+      (+ 1 ;; Add one for #
+         (treesit-node-start (treesit-node-child parent 0))
+         erlang-indent-guard))))
+
+(defun erlang-ts--anchor-comprehensions (node parent _bol &rest _)
+  "Return comprehension aligned with first element.
+Finds the first generator of PARENT and returns the position, or
+if NODE is the first generator, returns the position of the PARENT ||."
+  (let ((child (treesit-node-child parent 1)))
+    (if (and child (not (equal child node)))
+        (treesit-node-start child)
+      (+ (treesit-node-start (treesit-node-parent parent))
+         erlang-indent-level))))
 
 (defun erlang-ts--anchor-args (_node parent _bol &rest _)
   "Return anchor position for function arguments in PARENT.
@@ -739,12 +748,11 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ((parent-is "export_type_attribute") erlang-ts--anchor-after-open-bracket 0)
 
      ;; Comprehensions
-     ((parent-is "list_comprehension") parent-bol erlang-indent-level)
-     ((parent-is "binary_comprehension") parent-bol erlang-indent-level)
-     ((parent-is "lc_exprs") parent-bol 0)
-     ((parent-is "lc_or_zc_expr") parent-bol 0)
-     ((parent-is "generator") parent-bol erlang-indent-level)
-     ((parent-is "b_generator") parent-bol erlang-indent-level)
+     ((parent-is "list_comprehension") erlang-ts--anchor-first-child 0)
+     ((parent-is "lc_exprs") erlang-ts--anchor-comprehensions 0)
+     ((parent-is "lc_or_zc_expr") parent 0)
+     ((parent-is "generator") parent erlang-indent-level)
+     ((parent-is "binary_comprehension") erlang-ts--anchor-first-child 0)
 
      ;; Multi-line expressions
      ((parent-is "binary_op_expr") parent-bol erlang-indent-level)
