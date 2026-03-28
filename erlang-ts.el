@@ -498,12 +498,18 @@ all cases correctly, especially incomplete code during editing."
   :type 'boolean
   :group 'erlang)
 
-(defun erlang-ts--grand-parent-bol (_node parent _bol &rest _)
-  "Return the first non-whitespace position on PARENT's parent's line."
+(defun erlang-ts--grand-parent (_node parent _bol &rest _)
+  "Return the position on PARENT's parent."
   (when-let* ((gp (treesit-node-parent parent)))
     (save-excursion
       (goto-char (treesit-node-start gp))
-      (back-to-indentation)
+      (point))))
+
+(defun erlang-ts--great-grand-parent (_node parent _bol &rest _)
+  "Return the position on PARENT's parents parent."
+  (when-let* ((gp (treesit-node-parent (treesit-node-parent parent))))
+    (save-excursion
+      (goto-char (treesit-node-start gp))
       (point))))
 
 (defun erlang-ts--anchor-matching-open (node parent _bol &rest _)
@@ -527,6 +533,55 @@ position after it.  Used to align elements with the first element."
     (goto-char (treesit-node-start parent))
     (when (re-search-forward "[[({]" (treesit-node-end parent) t)
       (point))))
+
+(defun erlang-ts--anchor-first-child (node parent _bol &rest _)
+  "Return position aligned with first child.
+Finds the first child of parent and returns position or if NODE is
+the first child finds the first `(', `[', or `{' in PARENT and returns the
+position after it.  Used to align elements with the first element."
+  (save-excursion
+    (let ((child (treesit-node-child parent 1)))
+      (if (and child (not (equal child node)))
+          (goto-char (treesit-node-start child))
+        (goto-char (treesit-node-start parent))
+        (when (re-search-forward "[[({]" (treesit-node-end parent) t)
+          (point))))))
+
+(defun erlang-ts--anchor-second-child (node parent _bol &rest _)
+  "Return position aligned with first element.
+Finds the first non syntax item of the parent and returns position or if NODE
+is the first child finds the first `(', `[', or `{' in PARENT and returns the
+position after it.  Used to align elements with the first element,
+for example in maps."
+  (save-excursion
+    (let ((child (treesit-node-child parent 2)))
+      (if (and child (not (equal child node)))
+          (goto-char (treesit-node-start child))
+        (goto-char (treesit-node-start parent))
+        (when (re-search-forward "[[({]" (treesit-node-end parent) t)
+          (point))))))
+
+(defun erlang-ts--anchor-record (node parent _bol &rest _)
+  "Return record position aligned with first element.
+Finds the first element of record and returns the position, or
+if NODE is the first element, returns the position of the record name
+in PARENT + `erlang-indent-guard'."
+  (let ((child (treesit-node-child parent 2)))
+    (if (and child (not (equal child node)))
+        (treesit-node-start child)
+      (+ 1 ;; Add one for #
+         (treesit-node-start (treesit-node-child parent 0))
+         erlang-indent-guard))))
+
+(defun erlang-ts--anchor-comprehensions (node parent _bol &rest _)
+  "Return comprehension aligned with first element.
+Finds the first generator of PARENT and returns the position, or
+if NODE is the first generator, returns the position of the PARENT ||."
+  (let ((child (treesit-node-child parent 1)))
+    (if (and child (not (equal child node)))
+        (treesit-node-start child)
+      (+ (treesit-node-start (treesit-node-parent parent))
+         erlang-indent-level))))
 
 (defun erlang-ts--anchor-args (_node parent _bol &rest _)
   "Return anchor position for function arguments in PARENT.
@@ -587,7 +642,7 @@ Used for export/import attributes where `[' is the relevant delimiter."
 
 (defun erlang-ts--double-indent-offset (_node _parent _bol &rest _)
   "Return double `erlang-indent-level'."
-  (* 2 erlang-indent-level))
+  (* erlang-indent-level 2))
 
 (defun erlang-ts--match-clause-body-in (grandparent-type)
   "Return a matcher for clause_body children inside GRANDPARENT-TYPE."
@@ -625,17 +680,16 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ;; (changing indentation would change the string value)
      ((parent-is "^string$") no-indent 0)
 
-     ;; Top-level: column 0
-     ((parent-is "source_file") column-0 0)
-
-     ;; `end' aligns with opening construct
-     ((node-is "end") parent-bol 0)
+     ;; 'of', `end' and 'else' aligns with opening construct
+     ((node-is "end") parent 0)
+     ((node-is "else") parent 0)
+     ((node-is "of") parent 0)
 
      ;; Keywords that align with their opening construct
-     ((match "^catch$" "try_expr") parent-bol 0)
+     ((match "^catch$" "try_expr") parent 0)
 
      ;; receive_after aligns with receive
-     ((node-is "receive_after") parent-bol 0)
+     ((node-is "receive_after") parent 0)
 
      ;; Closing delimiters: align with their opening counterpart
      ((match "^[])}]$" nil) erlang-ts--anchor-matching-open 0)
@@ -643,42 +697,50 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ;; clause_body inside fun_clause/receive_after needs 2x indent
      ;; because the clause starts on the same line as the keyword
      (,(erlang-ts--match-clause-body-in "fun_clause")
-      erlang-ts--grand-parent-bol erlang-ts--double-indent-offset)
+      erlang-ts--great-grand-parent erlang-ts--double-indent-offset)
      (,(erlang-ts--match-clause-body-in "receive_after")
-      erlang-ts--grand-parent-bol erlang-ts--double-indent-offset)
+      erlang-ts--grand-parent erlang-ts--double-indent-offset)
      ;; if_clause body needs 2x indent only when the clause is on
      ;; the same line as the `if' keyword (inline style)
      (,(erlang-ts--match-inline-clause-body "if_clause" "if_expr")
-      erlang-ts--grand-parent-bol erlang-ts--double-indent-offset)
+      erlang-ts--grand-parent erlang-ts--double-indent-offset)
+
+     ;; guard/when handling
+     ((node-is "when") parent erlang-indent-guard)
 
      ;; Expressions inside clause_body: indent from the clause line
-     ((parent-is "clause_body") parent-bol erlang-indent-level)
+     ((parent-is "clause_body") erlang-ts--grand-parent erlang-indent-level)
 
      ;; Clauses inside block constructs
-     ((parent-is "case_expr") parent-bol erlang-indent-level)
-     ((parent-is "receive_expr") parent-bol erlang-indent-level)
-     ((parent-is "if_expr") parent-bol erlang-indent-level)
-     ((parent-is "try_expr") parent-bol erlang-indent-level)
-     ((parent-is "catch_clause") parent-bol erlang-indent-level)
-     ((parent-is "receive_after") parent-bol erlang-indent-level)
-     ((parent-is "anonymous_fun") parent-bol erlang-indent-level)
-     ((parent-is "block_expr") parent-bol erlang-indent-level)
-     ((parent-is "maybe_expr") parent-bol erlang-indent-level)
+     ((parent-is "case_expr") parent erlang-indent-level)
+     ((parent-is "receive_expr") parent erlang-indent-level)
+     ((parent-is "if_expr") parent erlang-indent-level)
+     ((parent-is "try_expr") parent erlang-indent-level)
+     ((parent-is "catch_clause") parent erlang-indent-level)
+     ((parent-is "receive_after") parent erlang-indent-level)
+     ((parent-is "anonymous_fun") parent erlang-indent-level)
+     ((parent-is "block_expr") parent erlang-indent-level)
+     ((parent-is "maybe_expr") parent erlang-indent-level)
 
      ;; Macro body: align after opening (
      ((parent-is "pp_define") erlang-ts--anchor-after-open-delim 0)
 
-     ;; Record/map fields: align after { (not ( which comes earlier)
-     ((node-is "record_field") erlang-ts--anchor-after-open-brace 0)
-     ((parent-is "record_expr") erlang-ts--anchor-after-open-brace 0)
-     ((parent-is "map_expr") erlang-ts--anchor-after-open-brace 0)
+     ;; Record/map fields:
+     ((parent-is "record_decl") erlang-ts--anchor-after-open-brace 0)
+     ((node-is "record_field") erlang-ts--anchor-record 0)
+     ((parent-is "field_expr") erlang-ts--grand-parent erlang-indent-level)
+     ((parent-is "map_expr") erlang-ts--anchor-second-child 0)
+     ((parent-is "map_field") parent erlang-indent-level)
 
      ;; Function arguments: smart alignment (Okeefe-aware)
      ((parent-is "expr_args") erlang-ts--anchor-args 0)
-     ;; Collections: align after opening delimiter
-     ((parent-is "^list$") erlang-ts--anchor-after-open-delim 0)
-     ((parent-is "^tuple$") erlang-ts--anchor-after-open-delim 0)
-     ((parent-is "^binary$") erlang-ts--anchor-after-open-delim 0)
+     ;; list and binary specific
+     ((parent-is "pipe") erlang-ts--grand-parent 0)
+     ((node-is ">>") parent 0)
+     ;; Collections: align after first child
+     ((parent-is "^list$") erlang-ts--anchor-first-child 0)
+     ((parent-is "^tuple$") erlang-ts--anchor-first-child 0)
+     ((parent-is "^binary$") erlang-ts--anchor-first-child 0)
 
      ;; Export/import attributes: align after [
      ((parent-is "export_attribute") erlang-ts--anchor-after-open-bracket 0)
@@ -686,18 +748,16 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ((parent-is "export_type_attribute") erlang-ts--anchor-after-open-bracket 0)
 
      ;; Comprehensions
-     ((parent-is "list_comprehension") parent-bol erlang-indent-level)
-     ((parent-is "binary_comprehension") parent-bol erlang-indent-level)
-     ((parent-is "lc_exprs") parent-bol 0)
-     ((parent-is "lc_or_zc_expr") parent-bol 0)
-     ((parent-is "generator") parent-bol erlang-indent-level)
-     ((parent-is "b_generator") parent-bol erlang-indent-level)
+     ((parent-is "list_comprehension") erlang-ts--anchor-first-child 0)
+     ((parent-is "lc_exprs") erlang-ts--anchor-comprehensions 0)
+     ((parent-is "lc_or_zc_expr") parent 0)
+     ((parent-is "generator") parent erlang-indent-level)
+     ((parent-is "binary_comprehension") erlang-ts--anchor-first-child 0)
 
      ;; Multi-line expressions
      ((parent-is "binary_op_expr") parent-bol erlang-indent-level)
      ((parent-is "match_expr") parent-bol erlang-indent-level)
      ((parent-is "unary_op_expr") parent-bol erlang-indent-level)
-     ((parent-is "pipe") parent-bol 0)
      ((parent-is "paren_expr") parent-bol erlang-indent-level)
 
      ;; Guard
@@ -708,6 +768,9 @@ The return value is suitable for `treesit-simple-indent-rules'."
      ((parent-is "type_alias") parent-bol erlang-ts--double-indent-offset)
      ((parent-is "opaque") parent-bol erlang-ts--double-indent-offset)
      ((parent-is "type_sig") parent-bol erlang-indent-level)
+
+     ;; Top-level: column 0
+     ((parent-is "source_file") column-0 0)
 
      ;; Error recovery
      ((parent-is "ERROR") parent-bol erlang-indent-level)

@@ -97,6 +97,25 @@ factorial(N) when N > 0 ->
         F()
     catch
         error:Reason ->
+            {error, Reason};
+        exit:Reason ->
+            {error, Reason};
+        Throw ->
+            {throw, Throw}
+    end.")
+
+  (when-indenting-it "indents try-of/catch"
+    "safe_call(F) ->
+    try F()
+    of
+        ok ->
+            ok;
+        Error ->
+            {error, Reason}
+    catch
+        error:Reason ->
+            {error, Reason};
+        exit:Reason ->
             {error, Reason}
     end.")
 
@@ -125,9 +144,41 @@ factorial(N) when N > 0 ->
             N + X
     end.")
 
-  (when-indenting-it "indents a list comprehension"
-    "doubles(Xs) ->
-    [X * 2 || X <- Xs].")
+  (when-indenting-it "indents a list"
+    "make_list() ->
+    A = [ foo,
+          bar
+        ],
+    [
+     a,b,c,d,
+     e,f
+    | A].")
+
+ (when-indenting-it "indents a tuple"
+   "make_tuple() ->
+    A = { foo,
+          bar
+        },
+    {a,b,c,d,
+     e,f,A}.")
+
+  (when-indenting-it "indents a map"
+   "make_map() ->
+    #{ foo => 1,
+       bar =>
+           2,
+       {complex,
+        key} => 3
+     }.")
+
+  (when-indenting-it "indents a binary"
+   "make_bin(Str) ->
+    Bin1 = << 1:1, 0:1, 1:1, 1:1,
+              0:4,
+              (byte_size(Str)):32/little
+           >>,
+    <<Bin1:binary,
+      Str:binary>>.")
 
   (when-indenting-it "indents a multi-line binary operation"
     "add(X, Y) ->
@@ -140,6 +191,15 @@ factorial(N) when N > 0 ->
                  age :: non_neg_integer()
                 }).")
 
+  (when-indenting-it "indents record constructs"
+    "make_record(A,B,C) ->
+    R1 = #record1{
+            field_1 =
+                A,
+            field_2 = B},
+    #record2{f1 = data,
+             f2 = R1}.")
+
   (when-indenting-it "indents a type definition"
     "-type color() :: red | green | blue.")
 
@@ -150,11 +210,22 @@ factorial(N) when N > 0 ->
         step2()
     end.")
 
+  (when-indenting-it "indents maybe"
+    "run() ->
+    maybe
+        foo ?= step1(),
+        bar ?= step2()
+    else
+        Err ->
+            {error, Err}
+    end.")
+
   (when-indenting-it "indents nested case expressions"
     "nested(X, Y) ->
     case X of
         a ->
-            case Y of
+            case Y
+            of
                 b ->
                     ok;
                 _ ->
@@ -163,6 +234,107 @@ factorial(N) when N > 0 ->
         _ ->
             skip
     end.")
+
+  ;; Assignment indentation: block constructs on the RHS of = should
+  ;; indent relative to where the construct starts, not the line start.
+
+  (when-indenting-it "indents case in assignment"
+    "f(T) ->
+    Var = case T of
+              parse -> ok;
+              validate -> error
+          end.")
+
+  (when-indenting-it "indents if in assignment"
+    "f() ->
+    Var = if
+              true -> ok;
+              false -> err
+          end.")
+
+  (when-indenting-it "indents try/catch in assignment"
+    "f() ->
+    Var = try
+              ok
+          catch
+              _:_ -> err
+          end.")
+
+  (when-indenting-it "indents receive in assignment"
+    "f() ->
+    Var = receive
+              Msg -> Msg
+          after 5000 ->
+                  timeout
+          end.")
+
+  (when-indenting-it "indents begin/end in assignment"
+    "f() ->
+    Var = begin
+              step1(),
+              step2()
+          end.")
+
+  (when-indenting-it "indents fun in assignment"
+    "f(N) ->
+    F = fun(X) ->
+                N + X
+        end.")
+
+  (when-indenting-it "indents block construct on next line after ="
+    "f(T) ->
+    Var =
+        case T of
+            parse -> ok
+        end.")
+
+  (when-indenting-it "indents when constructs"
+   "function(X, Y)
+  when X >= Y ->
+    F = fun (A)
+              when A > X ->
+                X;
+            (A) ->
+                A
+        end.")
+
+  (when-indenting-it "list comprehension 1"
+   "function(X) ->
+    L1 = [A ||
+             A <- X,
+             test_next_level(A)].")
+
+  (when-indenting-it "list comprehension 2"
+   "function(X) ->
+    [ A || {ok, A} <-
+               L1,
+           test_next_level(A)].")
+
+  (when-indenting-it "list comprehension 3"
+   "function(X) ->
+    [ very_long_function_name(A)
+      ||
+        A <- L2,
+        test_next_level(A)].")
+
+  (when-indenting-it "binary comprehension 1"
+   "function(X) ->
+    B1 = << << B:32,
+               A:32>> ||
+             <<A:32, B:32>> <-
+                 X>>")
+
+  (when-indenting-it "binary comprehension 2"
+   "function(X) ->
+    << <<B/binary>> || B <- Binary,
+                       byte_size(B) < 128 >>.")
+
+  (when-indenting-it "binary comprehension 3"
+   "function(X) ->
+    << <<B/binary>>
+       ||
+        <<B:32>> <- X,
+        test_next_level(B)>>.")
 
   (it "does not re-indent content inside strings (tree-sitter)"
     (let ((code "foo() ->\n    \"\nsome text\n  inside string\n\"."))
